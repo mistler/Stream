@@ -71,22 +71,26 @@ private:
 
     template<typename Iterator>
     friend auto MakeStream(Iterator begin, Iterator end);
+
+private:
+    Stream() {}
+
+    template<typename Iterator>
+    Stream(Iterator begin, Iterator end) {
+        values.reserve(std::distance(begin, end));
+        values.insert(values.end(), begin, end);
+    }
 };
 
 template<typename Iterator>
 auto MakeStream(Iterator begin, Iterator end) {
-    Stream<typename std::iterator_traits<Iterator>::value_type> s;
-    s.values.reserve(std::distance(begin, end));
-    s.values.insert(s.values.end(), begin, end);
-    return s;
+    using t = typename std::iterator_traits<Iterator>::value_type;
+    return Stream<t>(begin, end);
 }
 
 template<typename T>
 auto MakeStream(std::initializer_list<T> init) {
-    Stream<T> s;
-    s.values.reserve(init.size());
-    s.values.insert(s.values.end(), init.begin(), init.end());
-    return s;
+    return Stream<T>(init.begin(), init.end());
 }
 
 /*

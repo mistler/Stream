@@ -15,8 +15,9 @@ TEST(StreamTest, MakeStreamInitList) {
 
 TEST(StreamTest, MakeStreamViaIterator) {
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
+
     constexpr int arr_len = 3;
-    double arr[arr_len]{};
+    double arr[arr_len]{0.0, 1.0, 2.0};
 
     auto sv = MakeStream(vec.begin(), vec.end());
     auto sa = MakeStream(arr, arr+arr_len);
