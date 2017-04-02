@@ -38,6 +38,7 @@ class Stream {
 public:
     // TODO: // Constructor ??  // Move, copy ??  // Destructor ??
 
+    // Returns new Stream anyway (even in case of empty)
     template<typename Transform, typename U =
         decltype(std::declval<Transform>()(std::declval<T>()))>
     Stream<U> map(Transform &&transform) {
@@ -49,10 +50,38 @@ public:
         return s;
     }
 
-#if 0
-    template<typename Accumulator>
-    Stream<T> reduce(Accumulator &&accum);
+    // Returns new Stream anyway (even in case of empty)
+    template<typename IdentityFn, typename Accumulator, typename U =
+        decltype(std::declval<IdentityFn>()(std::declval<T>()))>
+    U reduce(IdentityFn &&identityFn, Accumulator &&accum) {
+        auto begin = values.begin();
+        if (begin == values.end()) throw 1;
+        U total = identityFn(*(begin++));
+        for (auto it = begin; it != values.end(); ++it) {
+            total = accum(total, *it);
+        }
+        return total;
+    }
 
+#if 0
+    // TODO: figure out how to deduce Uundeduced
+    // Returns new Stream anyway (even in case of empty)
+    template<typename Accumulator, typename Uundeduced, typename U =
+        decltype(std::declval<Accumulator>()(
+                    std::declval<Uundeduced>(), std::declval<T>()))>
+    Stream<U> reduce(Accumulator &&accum) {
+        U total;
+        auto begin = values.begin();
+        if (begin == values.end()) return total;
+        total = accum(total, *(begin++));
+        for (auto it = begin; it != values.end(); ++it) {
+            total = accum(total, *it);
+        }
+        return total;
+    }
+#endif
+
+#if 0
     template<typename IdentityFn, typename Accumulator>
     Stream<T> reduce(IdentityFn &&identityFn, Accumulator &&accum);
 

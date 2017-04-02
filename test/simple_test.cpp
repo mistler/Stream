@@ -53,7 +53,6 @@ TEST(StreamTest, mapSquareInt) {
     for (size_t i = 0; i < vec.size(); ++i) {
         EXPECT_EQ(vec[i]*vec[i], sv.nth(i));
     }
-    UNUSED(sv);
 }
 
 float half_int_as_float(int i) {
@@ -67,7 +66,6 @@ TEST(StreamTest, mapHalfIntAsFloat) {
     for (size_t i = 0; i < vec.size(); ++i) {
         EXPECT_NEAR(static_cast<float>(vec[i])/2.f, sv_float.nth(i), 1e-5);
     }
-    UNUSED(sv);
 }
 
 TEST(StreamTest, mapSquareIntLambda) {
@@ -77,7 +75,22 @@ TEST(StreamTest, mapSquareIntLambda) {
     for (size_t i = 0; i < vec.size(); ++i) {
         EXPECT_EQ(vec[i]*vec[i], sv.nth(i));
     }
-    UNUSED(sv);
+}
+
+TEST(StreamTest, reduceWithIdentitySumSameType) {
+    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto sv = MakeStream(vec);
+    auto total = sv.reduce([](int x) { return x; },
+            [](int x, int y) { return x+y; });
+    EXPECT_EQ(0+1+2+3+4, total);
+}
+
+TEST(StreamTest, reduceWithIdentitySumIntToFloat) {
+    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto sv = MakeStream(vec);
+    auto total = sv.reduce([](int x) { return static_cast<float>(x); },
+            [](float x, int y) { return x+static_cast<float>(y); });
+    EXPECT_NEAR(0.f+1.f+2.f+3.f+4.f, total, 1e-5);
 }
 
 #if 0
