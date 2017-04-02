@@ -38,12 +38,15 @@ class Stream {
 public:
     // TODO: // Constructor ??  // Move, copy ??  // Destructor ??
 
-    template<typename Transform>
-    Stream<T> map(Transform &&transform) {
+    template<typename Transform, typename U =
+        decltype(std::declval<Transform>()(std::declval<T>()))>
+    Stream<U> map(Transform &&transform) {
+        Stream<U> s;
+        s.values.reserve(values.size());
         for (auto it = values.begin(); it != values.end(); ++it) {
-            *it = transform(*it);
+            s.values.push_back(transform(*it));
         }
-        return *this;
+        return s;
     }
 
 #if 0
@@ -123,6 +126,9 @@ private:
 
     template<typename Generator>
     friend auto MakeStream(Generator &&generator);
+
+    template<typename U>
+    friend class Stream;
 
 private:
     Stream() {}

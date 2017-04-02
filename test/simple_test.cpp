@@ -56,6 +56,20 @@ TEST(StreamTest, mapSquareInt) {
     UNUSED(sv);
 }
 
+float half_int_as_float(int i) {
+    return static_cast<float>(i)/2.f;
+}
+TEST(StreamTest, mapHalfIntAsFloat) {
+    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto sv = MakeStream(vec);
+    float (*f)(int i) = half_int_as_float;
+    auto sv_float = sv.map(f);
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_NEAR(static_cast<float>(vec[i])/2.f, sv_float.nth(i), 1e-5);
+    }
+    UNUSED(sv);
+}
+
 TEST(StreamTest, mapSquareIntLambda) {
     auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec);
