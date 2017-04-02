@@ -56,9 +56,15 @@ public:
 
     template<typename Func>
     Stream<T> operator|(const Func &f);
+#endif
 
-    Stream<T> skip(const size_t amount);
+    Stream<T> skip(const size_t amount) {
+        // TODO: some checks for amount value
+        values.erase(values.begin(), values.begin() + amount);
+        return *this;
+    }
 
+#if 0
     Stream<T> group(const size_t N);
 #endif
 
