@@ -60,9 +60,20 @@ public:
     Stream<T> skip(const size_t amount);
 
     Stream<T> group(const size_t N);
-
-    Stream<T> sum();
 #endif
+
+    // Hope that we have operator+= for type T
+    // Returns unchanged Stream in case of empty
+    Stream<T> &sum() {
+        auto begin = values.begin();
+        if (begin == values.end()) return *this;
+        T &total = *(begin++);
+        for (auto it = begin; it != values.end(); ++it) {
+            total += *it;
+        }
+        values.erase(begin, values.end());
+        return *this;
+    }
 
     std::ostream &print_to(std::ostream &os, const char *delimiter = " ") {
         // TODO: here should be work with queue.
@@ -80,7 +91,7 @@ public:
         return values;
     }
 
-    T &nth(const size_t index) {
+    T nth(const size_t index) {
         // TODO: here should be work with queue.
         return values[index];
     }

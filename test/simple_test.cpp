@@ -32,6 +32,12 @@ TEST(StreamTest, MakeStreamFromContainer) {
     UNUSED(sv);
 }
 
+TEST(StreamTest, MakeStreamFromContainerEmpty) {
+    const auto vec = std::vector<int>(0);
+    auto sv = MakeStream(vec);
+    UNUSED(sv);
+}
+
 TEST(StreamTest, MakeStreamFromContainerMove) {
     auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec);
@@ -57,6 +63,16 @@ TEST(StreamTest, SimpleTest) {
 }
 #endif
 
+TEST(StreamTest, sum) {
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto s = MakeStream(vec.begin(), vec.end());
+    int sum;
+    for (const int &t : vec) {
+        sum += t;
+    }
+    EXPECT_EQ(sum, s.sum().nth(0));
+}
+
 TEST(StreamTest, print_to) {
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
     auto s = MakeStream(vec.begin(), vec.end());
@@ -74,7 +90,7 @@ TEST(StreamTest, Nth) {
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
     auto s = MakeStream(vec.begin(), vec.end());
     for (size_t i = 0; i < vec.size(); ++i) {
-        EXPECT_EQ(s.nth(i), vec[i]);
+        EXPECT_EQ(vec[i], s.nth(i));
     }
 }
 
@@ -83,6 +99,6 @@ TEST(StreamTest, ToVector) {
     auto s = MakeStream(vec.begin(), vec.end());
     std::vector<int> s_vec = s.to_vector();
     for (size_t i = 0; i < vec.size(); ++i) {
-        EXPECT_EQ(s_vec[i], vec[i]);
+        EXPECT_EQ(vec[i], s_vec[i]);
     }
 }
