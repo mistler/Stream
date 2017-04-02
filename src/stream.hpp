@@ -36,15 +36,17 @@ auto MakeStream(Generator &&generator);
 template<typename T>
 class Stream {
 public:
-    // Constructor ??
-    // Move, copy ??
-    // Destructor ??
-
-#if 0
+    // TODO: // Constructor ??  // Move, copy ??  // Destructor ??
 
     template<typename Transform>
-    Stream<T> map(Transform &&transform);
+    Stream<T> map(Transform &&transform) {
+        for (auto it = values.begin(); it != values.end(); ++it) {
+            *it = transform(*it);
+        }
+        return *this;
+    }
 
+#if 0
     template<typename Accumulator>
     Stream<T> reduce(Accumulator &&accum);
 
@@ -65,6 +67,7 @@ public:
     }
 
 #if 0
+    // TODO: figure out what this is about
     Stream<T> group(const size_t N);
 #endif
 

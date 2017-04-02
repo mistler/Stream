@@ -44,6 +44,28 @@ TEST(StreamTest, MakeStreamFromContainerMove) {
     UNUSED(sv);
 }
 
+int square_int(int i) { return i*i; }
+TEST(StreamTest, mapSquareInt) {
+    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto sv = MakeStream(vec);
+    int (*f)(int i) = square_int;
+    sv = sv.map(f);
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_EQ(vec[i]*vec[i], sv.nth(i));
+    }
+    UNUSED(sv);
+}
+
+TEST(StreamTest, mapSquareIntLambda) {
+    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto sv = MakeStream(vec);
+    sv = sv.map([](auto x) { return x*x; });
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_EQ(vec[i]*vec[i], sv.nth(i));
+    }
+    UNUSED(sv);
+}
+
 #if 0
 template<typename GenType>
 struct SimpleGenerator {
@@ -54,12 +76,6 @@ TEST(StreamTest, MakeStreamWithGenerator) {
     auto &&gen = SimpleGenerator<float>();
     auto s = MakeStream(gen);
     UNUSED(s);
-}
-
-TEST(StreamTest, SimpleTest) {
-    auto s = MakeStream{1, 2, 3, 4, 5};
-    s | map([](auto x) { return x * x; })
-        | print_to(std::cout) << std::endl;
 }
 #endif
 
@@ -113,3 +129,12 @@ TEST(StreamTest, ToVector) {
         EXPECT_EQ(vec[i], s_vec[i]);
     }
 }
+
+#if 0
+TEST(StreamTest, SimpleTest) {
+    auto s = MakeStream{1, 2, 3, 4, 5};
+    s | map([](auto x) { return x * x; })
+        | print_to(std::cout) << std::endl;
+}
+#endif
+
