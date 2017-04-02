@@ -7,7 +7,11 @@
 #include <iterator>
 #include <ostream>
 #include <queue>
+#include <type_traits>
 #include <vector>
+
+// TODO: remove me!!!
+#include <iostream>
 
 namespace stream {
 
@@ -20,6 +24,15 @@ auto MakeStream(std::initializer_list<T> init);
 template<typename Iterator>
 auto MakeStream(Iterator begin, Iterator end);
 
+template<typename Container>
+auto MakeStream(const Container &cont);
+
+template<typename Container>
+auto MakeStream(Container &&cont);
+
+template<typename Generator>
+auto MakeStream(Generator &&generator);
+
 template<typename T>
 class Stream {
 public:
@@ -28,10 +41,6 @@ public:
     // Destructor ??
 
 #if 0
-    template<typename Generator>
-    Stream<T> MakeStream(Generator &&generator);
-
-    Stream<T> MakeStream(value1, value2, ...);
 
     template<typename Transform>
     Stream<T> map(Transform &&transform);
@@ -53,14 +62,28 @@ public:
     Stream<T> group(const size_t N);
 
     Stream<T> sum();
-
-    std::ostream &print_to(std::ostream &os,
-            const char *delimiter = ' ');
-
-    std::vector<T> to_vector();
-
-    T &nth(const size_t index);
 #endif
+
+    std::ostream &print_to(std::ostream &os, const char *delimiter = " ") {
+        // TODO: here should be work with queue.
+        auto it = values.begin();
+        if (it == values.end()) return os;
+        os << *(it++);
+        for (; it != values.end(); ++it) {
+            os << delimiter << *it;
+        }
+        return os;
+    }
+
+    std::vector<T> to_vector() {
+        // TODO: here should be work with queue.
+        return values;
+    }
+
+    T &nth(const size_t index) {
+        // TODO: here should be work with queue.
+        return values[index];
+    }
 
 private:
     std::vector<T> values;
@@ -71,6 +94,15 @@ private:
 
     template<typename Iterator>
     friend auto MakeStream(Iterator begin, Iterator end);
+
+    template<typename Container>
+    friend auto MakeStream(const Container &cont);
+
+    template<typename Container>
+    friend auto MakeStream(Container &&cont);
+
+    template<typename Generator>
+    friend auto MakeStream(Generator &&generator);
 
 private:
     Stream() {}
@@ -93,16 +125,63 @@ auto MakeStream(std::initializer_list<T> init) {
     return Stream<T>(init.begin(), init.end());
 }
 
-/*
 template<typename Container>
 auto MakeStream(const Container &cont) {
-    return nullptr;
+    return Stream<typename Container::value_type>(cont.begin(), cont.end());
 }
 
 template<typename Container>
 auto MakeStream(Container &&cont) {
-    return nullptr;
+    return Stream<typename std::remove_reference<Container>::type::value_type>(
+            // TODO: really move iterators???
+            std::move(cont.begin()), std::move(cont.end()));
 }
+
+#if 0
+// Actually checks if class contains const interator
+template<typename T>
+class is_container {
+    typedef float s;
+    typedef double d;
+
+    template<typename C> static s test(typename C::const_iterator*);
+    template<typename C> static d test(...);
+
+public:
+    enum { value = sizeof(test<T>(0)) == sizeof(s) };
+};
+
+template<typename Container, typename T =
+std::enable_if<is_container<Container>::value, Container>>
+auto MakeStream(T &&cont) {
+    return Stream<typename std::remove_reference<T>::type::value_type>(
+            // TODO: really move iterators???
+            std::move(cont.begin()), std::move(cont.end()));
+}
+
+template<typename T>
+class is_generator {
+    typedef float s;
+    typedef double d;
+
+    template<typename C> static s test(decltype(&C::operator()));
+    template<typename C> static d test(...);
+
+public:
+    enum { value = sizeof(test<T>(0)) == sizeof(s) };
+};
+
+template<typename Generator>
+auto MakeStream(Generator &&generator) {
+    std::cout << "GENERATOR" << std::endl;
+    auto &&generated = generator();
+    Stream<typename std::remove_reference<decltype(generated)>::type> s;
+    s.values.push_back(std::move(s));
+}
+#endif
+
+/*
+auto MakeStream(value1, value2, ...);
 */
 
 } // namespace stream
