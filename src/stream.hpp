@@ -1,10 +1,24 @@
 #ifndef STREAM_SRC_STREAM_HPP_
 #define STREAM_SRC_STREAM_HPP_
 
-#include <iostream>
+#include <cstddef>
+
+#include <initializer_list>
+#include <iterator>
+#include <ostream>
+#include <queue>
 #include <vector>
 
 namespace stream {
+
+template<typename T>
+class Stream;
+
+template<typename T>
+auto MakeStream(std::initializer_list<T> init);
+
+template<typename Iterator>
+auto MakeStream(Iterator begin, Iterator end);
 
 template<typename T>
 class Stream {
@@ -13,23 +27,11 @@ public:
     // Move, copy ??
     // Destructor ??
 
-    template<typename Iterator>
-    static Stream<T> MakeStream(Iterator begin, Iterator end);
-
-    template<typename Container>
-    static Stream<T> MakeStream(const Container &cont);
-
-    template<typename Container>
-    static Stream<T> MakeStream(Container &&cont);
-
-    static Stream<T> MakeStream(std::initializer_list<T> init);
-
 #if 0
     template<typename Generator>
     Stream<T> MakeStream(Generator &&generator);
 
     Stream<T> MakeStream(value1, value2, ...);
-#endif
 
     template<typename Transform>
     Stream<T> map(Transform &&transform);
@@ -43,7 +45,8 @@ public:
     template<typename Predicate>
     Stream<T> filter(Predicate &&predicate);
 
-    Stream<T> operator|(const Stream<T> &another);
+    template<typename Func>
+    Stream<T> operator|(const Func &f);
 
     Stream<T> skip(const size_t amount);
 
@@ -57,7 +60,46 @@ public:
     std::vector<T> to_vector();
 
     T &nth(const size_t index);
+#endif
+
+private:
+    std::vector<T> values;
+    //std::queue<function<???>> actions_queue;
+    //
+private:
+    friend auto MakeStream<T>(std::initializer_list<T> init);
+
+    template<typename Iterator>
+    friend auto MakeStream(Iterator begin, Iterator end);
 };
+
+template<typename Iterator>
+auto MakeStream(Iterator begin, Iterator end) {
+    Stream<typename std::iterator_traits<Iterator>::value_type> s;
+    s.values.reserve(std::distance(begin, end));
+    s.values.insert(s.values.end(), begin, end);
+    return s;
+}
+
+template<typename T>
+auto MakeStream(std::initializer_list<T> init) {
+    Stream<T> s;
+    s.values.reserve(init.size());
+    s.values.insert(s.values.end(), init.begin(), init.end());
+    return s;
+}
+
+/*
+template<typename Container>
+auto MakeStream(const Container &cont) {
+    return nullptr;
+}
+
+template<typename Container>
+auto MakeStream(Container &&cont) {
+    return nullptr;
+}
+*/
 
 } // namespace stream
 
