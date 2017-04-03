@@ -26,8 +26,6 @@ TEST(Reduce, SumSameType) {
     EXPECT_EQ(0+1+2+3+4, total);
 }
 
-// TODO: enable me after support of different return type is implemented!!!
-#if 0
 TEST(Reduce, SumIntToFLoat) {
     auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec);
@@ -35,4 +33,3 @@ TEST(Reduce, SumIntToFLoat) {
             return static_cast<float>(x+y); });
     EXPECT_NEAR(0.f+1.f+2.f+3.f+4.f, total, 1e-5);
 }
-#endif

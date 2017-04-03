@@ -33,9 +33,7 @@ TEST(Map, HalfIntAsFloat) {
     }
 }
 
-// TODO: fix me: error that sv_float is different object than sv.
-#if 0
-TEST(Map, HalfIntAsFloat) {
+TEST(Map, HalfIntAsFloatDifferentObject) {
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec);
     float (*f)(int i) = half_int_as_float;
@@ -44,7 +42,6 @@ TEST(Map, HalfIntAsFloat) {
         EXPECT_NEAR(static_cast<float>(vec[i])/2.f, sv_float.nth(i), 1e-5);
     }
 }
-#endif
 
 TEST(Map, SquareIntLambdaPassByValue) {
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
@@ -56,8 +53,6 @@ TEST(Map, SquareIntLambdaPassByValue) {
     }
 }
 
-// TODO: enable me when forwarding works correctly
-#if 0
 TEST(Map, SquareIntLambdaTemporaryObject) {
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec);
@@ -66,4 +61,3 @@ TEST(Map, SquareIntLambdaTemporaryObject) {
         EXPECT_EQ(vec[i]*vec[i], sv.nth(i));
     }
 }
-#endif

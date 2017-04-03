@@ -15,8 +15,6 @@ TEST(Filter, EvenNumbersPassByValue) {
     }
 }
 
-// TODO: fix me
-#if 0
 TEST(Filter, EvenNumbersTemporaryObject) {
     auto sv = MakeStream({0, 1, 2, 3, 4, 5});
     sv = sv.filter([](int x) { return (x%2) == 0; });
@@ -24,4 +22,3 @@ TEST(Filter, EvenNumbersTemporaryObject) {
         EXPECT_EQ(i*2, sv.nth(i));
     }
 }
-#endif
