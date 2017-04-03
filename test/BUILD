@@ -7,11 +7,24 @@ GTEST_COPTS = COPTS + ["-Iexternal/gtest/include"]
 
 cc_test(
     name = "test",
-    srcs = ["simple_test.cpp"],
+    srcs = [
+            "filter_test.cpp",
+            "group_test.cpp",
+            "makestream_test.cpp",
+            "map_test.cpp",
+            "nth_test.cpp",
+            "printto_test.cpp",
+            "reduce_test.cpp",
+            "simple_test.cpp",
+            "skip_test.cpp",
+            "sum_test.cpp",
+            "tovector_test.cpp",
+            "pipe_test.cpp",
+    ],
     copts = GTEST_COPTS,
     deps = [
             "@gtest//:main",
             "//src:stream"
-           ],
+    ],
     timeout = "short",
 )
