@@ -20,24 +20,42 @@ namespace stream {
 template<typename T>
 class Stream;
 
-template<typename T>
-auto MakeStream(std::initializer_list<T> init);
-
 template<typename Iterator>
-auto MakeStream(Iterator begin, Iterator end);
+auto MakeStream(Iterator begin, Iterator end) {
+    using T = typename std::iterator_traits<Iterator>::value_type;
+    return Stream<T>(begin, end);
+}
+
+template<typename T>
+auto MakeStream(std::initializer_list<T> init) {
+    return Stream<T>(init.begin(), init.end());
+}
 
 template<typename Container>
-auto MakeStream(const Container &cont);
+auto MakeStream(const Container &cont) {
+    return Stream<typename Container::value_type>(cont.begin(), cont.end());
+}
 
 template<typename Container>
-auto MakeStream(Container &&cont);
-
-template<typename Generator>
-auto MakeStream(Generator &&generator);
+auto MakeStream(Container &&cont) {
+    return Stream<typename std::remove_reference<Container>::type::value_type>(
+            // TODO: really move iterators???
+            std::move(cont.begin()), std::move(cont.end()));
+}
 
 template<typename T>
 class Stream {
 public:
+
+    // TODO: make me private and fix clang compilation errors
+    template<typename Iterator, typename U =
+        typename std::iterator_traits<Iterator>::value_type>
+    Stream(Iterator begin, Iterator end) {
+        auto v = new std::vector<U>();
+        v->reserve(std::distance(begin, end));
+        v->insert(v->end(), begin, end);
+        values = reinterpret_cast<void*>(v);
+    }
     // TODO: // Constructor ??  // Move, copy ??  // Destructor ??
     // TODO: thread safe?
     // TODO: const methods?
@@ -46,7 +64,7 @@ public:
 
     template<typename Transform, typename U =
         decltype(std::declval<Transform>()(std::declval<T>()))>
-    Stream<U> map(Transform &&transform) {
+    Stream<U> &map(Transform &&transform) {
         auto deferred = [] (Stream<T> *current_stream, Transform &&transform) {
             auto vp = reinterpret_cast<std::vector<T>*>(current_stream->values);
             auto svp = new std::vector<U>();
@@ -58,7 +76,6 @@ public:
             current_stream->values = svp;
         };
         defer_execution(deferred, this, std::forward<Transform>(transform));
-        execute();
         return *reinterpret_cast<Stream<U>*>(this);
     }
 
@@ -66,6 +83,7 @@ public:
     template<typename IdentityFn, typename Accumulator, typename U =
         decltype(std::declval<IdentityFn>()(std::declval<T>()))>
     U reduce(IdentityFn &&identityFn, Accumulator &&accum) {
+        execute();
         auto &v = *reinterpret_cast<std::vector<T>*>(values);
         auto begin = v.begin();
         if (begin == v.end()) throw 1;
@@ -76,14 +94,15 @@ public:
         return total;
     }
 
+    // Hope that we have copy constructor for type T
     // TODO: extend it to support different than T return type
     // TODO: figure out what to do in case of empty
     template<typename Accumulator>
     T reduce(Accumulator &&accum) {
+        execute();
         auto &v = *reinterpret_cast<std::vector<T>*>(values);
         auto begin = v.begin();
         if (begin == v.end()) throw 1;
-        // Copy to keep first element of Stream clean
         T total = *(begin++);
         for (auto it = begin; it != v.end(); ++it) {
             total = accum(total, *it);
@@ -109,17 +128,22 @@ public:
 #endif
 
     template<typename Predicate>
-    Stream<T> filter(Predicate &&predicate) {
-        Stream<T> s;
-        auto &v = *reinterpret_cast<std::vector<T>*>(values);
-        auto &sv = *reinterpret_cast<std::vector<T>*>(s.values);
-        for (auto it = v.begin(); it != v.end(); ++it) {
-            auto &v = *it;
-            if (predicate(v)) sv.push_back(v);
-        }
-        return s;
+    Stream<T> &filter(Predicate &&predicate) {
+        auto deferred = [] (Stream<T> *current_stream, Predicate &&predicate) {
+            auto vp = reinterpret_cast<std::vector<T>*>(current_stream->values);
+            auto svp = new std::vector<T>();
+            for (auto it = vp->begin(); it != vp->end(); ++it) {
+                auto &v = *it;
+                if (predicate(v)) svp->push_back(v);
+            }
+            delete vp;
+            current_stream->values = svp;
+        };
+        defer_execution(deferred, this, std::forward<Predicate>(predicate));
+        return *this;
     }
 
+// TODO: implement me
 #if 0
     template<typename Func,
         typename RetType =
@@ -130,62 +154,72 @@ public:
     }
 #endif
 
-    Stream<T> skip(const size_t amount) {
+    Stream<T> &skip(const size_t amount) {
         // TODO: some checks for amount value
-        auto &v = *reinterpret_cast<std::vector<T>*>(values);
-        v.erase(v.begin(), v.begin() + amount);
+        auto deferred = [] (Stream<T> *current_stream, const size_t amount) {
+            auto vp = reinterpret_cast<std::vector<T>*>(current_stream->values);
+            vp->erase(vp->begin(), vp->begin() + amount);
+        };
+        defer_execution(deferred, this, amount);
         return *this;
     }
 
     // TODO: figure out what to do in case of N=0
-    Stream<Stream<T>> group(const size_t N) {
-        if (N == 0) throw 1;
-        Stream<Stream<T>> s;
-        auto &v = *reinterpret_cast<std::vector<T>*>(values);
-        auto &sv = *reinterpret_cast<std::vector<Stream<T>>*>(s.values);
-        sv.reserve(div_up(v.size(), N));
-        for (auto it = v.begin();;) {
-            Stream<T> inside_stream = MakeStream(it, it+N);
-            sv.push_back(inside_stream);
-            it += N;
-            if (it >= v.end()) break;
-        }
-        return s;
+    Stream<Stream<T>> &group(const size_t N) {
+        auto deferred = [] (Stream<T> *current_stream, const size_t N) {
+            auto vp = reinterpret_cast<std::vector<T>*>(current_stream->values);
+            auto svp = new std::vector<Stream<T>>(); // TODO here and everywhere else
+            // Do we really need () ???????
+            // TODO: we dont want to reserve a lot of memory
+            // It works not ok in case of input stream size = 1 and N = 100000
+            svp->reserve(div_up(vp->size(), N));
+            for (auto it = vp->begin();;) {
+                Stream<T> inside_stream = MakeStream(it, it+N);
+                svp->push_back(inside_stream);
+                it += N;
+                if (it >= vp->end()) break;
+            }
+            delete vp;
+            current_stream->values = svp;
+        };
+        defer_execution(deferred, this, N);
+        return *reinterpret_cast<Stream<Stream<T>>*>(this);
     }
 
     // Hope that we have operator+= for type T
     // Hope that we have copy constructor for T
     // TODO: figure out what to do with empty stream
     T sum() {
-        auto &v = *reinterpret_cast<std::vector<T>*>(values);
-        auto begin = v.begin();
-        if (begin == v.end()) throw 1;
+        execute();
+        auto vp = reinterpret_cast<std::vector<T>*>(values);
+        auto begin = vp->begin();
+        if (begin == vp->end()) throw 1;
         T total = *(begin++);
-        for (auto it = begin; it != v.end(); ++it) {
+        for (auto it = begin; it != vp->end(); ++it) {
             total += *it;
         }
         return total;
     }
 
     std::ostream &print_to(std::ostream &os, const char *delimiter = " ") {
-        // TODO: here should be work with queue.
-        auto &v = *reinterpret_cast<std::vector<T>*>(values);
-        auto it = v.begin();
-        if (it == v.end()) return os;
+        execute();
+        auto vp = reinterpret_cast<std::vector<T>*>(values);
+        auto it = vp->begin();
+        if (it == vp->end()) return os;
         os << *(it++);
-        for (; it != v.end(); ++it) {
+        for (; it != vp->end(); ++it) {
             os << delimiter << *it;
         }
         return os;
     }
 
     std::vector<T> to_vector() {
-        // TODO: here should be work with queue.
+        execute();
         return *reinterpret_cast<std::vector<T>*>(values);
     }
 
     T nth(const size_t index) {
-        // TODO: here should be work with queue.
+        execute();
         return (*reinterpret_cast<std::vector<T>*>(values))[index];
     }
 
@@ -196,15 +230,6 @@ private:
 
 private:
     Stream(): values(reinterpret_cast<std::vector<T>*>(new std::vector<T>)) {}
-
-    template<typename Iterator, typename U =
-        typename std::iterator_traits<Iterator>::value_type>
-    Stream(Iterator begin, Iterator end) {
-        auto v = new std::vector<U>();
-        v->reserve(std::distance(begin, end));
-        v->insert(v->end(), begin, end);
-        values = reinterpret_cast<void*>(v);
-    }
 
     // TODO: do correct forwarding of f
     template<typename F, typename ...Args>
@@ -242,29 +267,6 @@ private:
     template<typename U>
     friend class Stream;
 };
-
-template<typename Iterator>
-auto MakeStream(Iterator begin, Iterator end) {
-    using T = typename std::iterator_traits<Iterator>::value_type;
-    return Stream<T>(begin, end);
-}
-
-template<typename T>
-auto MakeStream(std::initializer_list<T> init) {
-    return Stream<T>(init.begin(), init.end());
-}
-
-template<typename Container>
-auto MakeStream(const Container &cont) {
-    return Stream<typename Container::value_type>(cont.begin(), cont.end());
-}
-
-template<typename Container>
-auto MakeStream(Container &&cont) {
-    return Stream<typename std::remove_reference<Container>::type::value_type>(
-            // TODO: really move iterators???
-            std::move(cont.begin()), std::move(cont.end()));
-}
 
 #if 0
 // Actually checks if class contains const interator
