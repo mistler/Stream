@@ -232,8 +232,6 @@ private:
     std::queue<std::function<void(void*)>> functions;
 
 private:
-    Stream(): values(reinterpret_cast<std::vector<T>*>(new std::vector<T>)) {}
-
     void execute() {
         while (!functions.empty()) {
             functions.front()(this);
