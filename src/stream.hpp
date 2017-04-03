@@ -120,10 +120,19 @@ public:
         return *this;
     }
 
-#if 0
-    // TODO: figure out what this is about
-    Stream<T> group(const size_t N);
-#endif
+    // TODO: figure out what to do in case of N=0
+    Stream<Stream<T>> group(const size_t N) {
+        if (N == 0) throw 1;
+        Stream<Stream<T>> s;
+        s.values.reserve(div_up(values.size(), N));
+        for (auto it = values.begin();;) {
+            Stream<T> inside_stream = MakeStream(it, it+N);
+            s.values.push_back(inside_stream);
+            it += N;
+            if (it >= values.end()) break;
+        }
+        return s;
+    }
 
     // Hope that we have operator+= for type T
     // Returns unchanged Stream in case of empty
@@ -189,6 +198,11 @@ private:
     Stream(Iterator begin, Iterator end) {
         values.reserve(std::distance(begin, end));
         values.insert(values.end(), begin, end);
+    }
+
+    template<typename U>
+    static U div_up(const U &a, const U &b) {
+        return (a + b - 1) / b;
     }
 };
 
