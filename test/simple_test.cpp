@@ -93,6 +93,24 @@ TEST(StreamTest, reduceWithIdentitySumIntToFloat) {
     EXPECT_NEAR(0.f+1.f+2.f+3.f+4.f, total, 1e-5);
 }
 
+TEST(StreamTest, reduceSumSameType) {
+    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto sv = MakeStream(vec);
+    auto total = sv.reduce([](int x, int y) { return x+y; });
+    EXPECT_EQ(0+1+2+3+4, total);
+}
+
+// TODO: enable me after support of different return type is implemented!!!
+#if 0
+TEST(StreamTest, reduceSumIntToFLoat) {
+    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto sv = MakeStream(vec);
+    auto total = sv.reduce([](int x, int y) {
+            return static_cast<float>(x+y); });
+    EXPECT_NEAR(0.f+1.f+2.f+3.f+4.f, total, 1e-5);
+}
+#endif
+
 #if 0
 template<typename GenType>
 struct SimpleGenerator {

@@ -50,7 +50,7 @@ public:
         return s;
     }
 
-    // Returns new Stream anyway (even in case of empty)
+    // TODO: figure out what to do in case of empty
     template<typename IdentityFn, typename Accumulator, typename U =
         decltype(std::declval<IdentityFn>()(std::declval<T>()))>
     U reduce(IdentityFn &&identityFn, Accumulator &&accum) {
@@ -63,6 +63,19 @@ public:
         return total;
     }
 
+    // TODO: extend it to support different than T return type
+    // TODO: figure out what to do in case of empty
+    template<typename Accumulator>
+    T reduce(Accumulator &&accum) {
+        auto begin = values.begin();
+        if (begin == values.end()) throw 1;
+        // Copy to keep first element of Stream clean
+        T total = *(begin++);
+        for (auto it = begin; it != values.end(); ++it) {
+            total = accum(total, *it);
+        }
+        return total;
+    }
 #if 0
     // TODO: figure out how to deduce Uundeduced
     // Returns new Stream anyway (even in case of empty)
