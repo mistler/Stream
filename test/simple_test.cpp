@@ -9,6 +9,13 @@
 
 using namespace stream;
 
+// Helper functions
+static int square_int(int i) { return i*i; }
+
+static float half_int_as_float(int i) {
+    return static_cast<float>(i)/2.f;
+}
+
 TEST(StreamTest, MakeStreamInitList) {
     auto s = MakeStream({1, 2, 3});
     UNUSED(s);
@@ -44,9 +51,8 @@ TEST(StreamTest, MakeStreamFromContainerMove) {
     UNUSED(sv);
 }
 
-int square_int(int i) { return i*i; }
 TEST(StreamTest, mapSquareInt) {
-    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec);
     int (*f)(int i) = square_int;
     sv = sv.map(f);
@@ -55,11 +61,8 @@ TEST(StreamTest, mapSquareInt) {
     }
 }
 
-float half_int_as_float(int i) {
-    return static_cast<float>(i)/2.f;
-}
 TEST(StreamTest, mapHalfIntAsFloat) {
-    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec);
     float (*f)(int i) = half_int_as_float;
     auto sv_float = sv.map(f);
@@ -69,7 +72,7 @@ TEST(StreamTest, mapHalfIntAsFloat) {
 }
 
 TEST(StreamTest, mapSquareIntLambda) {
-    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec);
     sv = sv.map([](auto x) { return x*x; });
     for (size_t i = 0; i < vec.size(); ++i) {
@@ -78,24 +81,21 @@ TEST(StreamTest, mapSquareIntLambda) {
 }
 
 TEST(StreamTest, reduceWithIdentitySumSameType) {
-    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
-    auto sv = MakeStream(vec);
+    auto sv = MakeStream({0, 1, 2, 3, 4});
     auto total = sv.reduce([](int x) { return x; },
             [](int x, int y) { return x+y; });
     EXPECT_EQ(0+1+2+3+4, total);
 }
 
 TEST(StreamTest, reduceWithIdentitySumIntToFloat) {
-    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
-    auto sv = MakeStream(vec);
+    auto sv = MakeStream({0, 1, 2, 3, 4});
     auto total = sv.reduce([](int x) { return static_cast<float>(x); },
             [](float x, int y) { return x+static_cast<float>(y); });
     EXPECT_NEAR(0.f+1.f+2.f+3.f+4.f, total, 1e-5);
 }
 
 TEST(StreamTest, reduceSumSameType) {
-    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
-    auto sv = MakeStream(vec);
+    auto sv = MakeStream({0, 1, 2, 3, 4});
     auto total = sv.reduce([](int x, int y) { return x+y; });
     EXPECT_EQ(0+1+2+3+4, total);
 }
@@ -108,6 +108,54 @@ TEST(StreamTest, reduceSumIntToFLoat) {
     auto total = sv.reduce([](int x, int y) {
             return static_cast<float>(x+y); });
     EXPECT_NEAR(0.f+1.f+2.f+3.f+4.f, total, 1e-5);
+}
+#endif
+
+TEST(StreamTest, filterEvenNumbers) {
+    auto sv = MakeStream({0, 1, 2, 3, 4, 5});
+    sv = sv.filter([](int x) { return (x%2) == 0; });
+    for (int i = 0; i < 3; i++) {
+        EXPECT_EQ(i*2, sv.nth(i));
+    }
+}
+
+#if 0
+TEST(StreamTest, pipeOperatorMapSquareInt) {
+    int (*f)(int i) = square_int;
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto sv = MakeStream(vec) | map(f);
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_EQ(vec[i]*vec[i], sv.nth(i));
+    }
+}
+
+TEST(StreamTest, pipeOperatorLambda11SquareInt) {
+    int (*f)(int i) = square_int;
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto sv = MakeStream(vec) | [](int x) { return x*x; };
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_EQ(vec[i]*vec[i], sv.nth(i));
+    }
+}
+
+TEST(StreamTest, pipeOperatorLambda14SquareInt) {
+    int (*f)(int i) = square_int;
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto sv = MakeStream(vec) | [](auto x) { return x*x; };
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_EQ(vec[i]*vec[i], sv.nth(i));
+    }
+}
+#endif
+
+#if 0
+TEST(StreamTest, pipeOperatorToVector) {
+    auto vec = std::vector<int>{0, 1, 2, 3, 4, 5};
+    auto s = MakeStream(vec);
+    auto s_vec = s | to_vector();
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_EQ(vec[i], s_vec[i]);
+    }
 }
 #endif
 

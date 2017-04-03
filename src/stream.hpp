@@ -94,15 +94,24 @@ public:
     }
 #endif
 
-#if 0
-    template<typename IdentityFn, typename Accumulator>
-    Stream<T> reduce(IdentityFn &&identityFn, Accumulator &&accum);
-
     template<typename Predicate>
-    Stream<T> filter(Predicate &&predicate);
+    Stream<T> filter(Predicate &&predicate) {
+        Stream<T> s;
+        for (auto it = values.begin(); it != values.end(); ++it) {
+            auto &v = *it;
+            if (predicate(v)) s.values.push_back(v);
+        }
+        return s;
+    }
 
-    template<typename Func>
-    Stream<T> operator|(const Func &f);
+#if 0
+    template<typename Func,
+        typename RetType =
+        decltype(std::declval<Func>()(std::declval<Stream<T>>())),
+        typename U = typename std::enable_if<RetType::is_stream, RetType>::type>
+    U operator|(const Func &f) {
+        return this->f();
+    }
 #endif
 
     Stream<T> skip(const size_t amount) {
@@ -151,9 +160,10 @@ public:
     }
 
 private:
+    enum { is_stream = 1 };
     std::vector<T> values;
     //std::queue<function<???>> actions_queue;
-    //
+
 private:
     friend auto MakeStream<T>(std::initializer_list<T> init);
 
