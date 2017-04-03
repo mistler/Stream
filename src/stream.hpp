@@ -13,6 +13,7 @@
 
 // TODO: remove me!!!
 #include <iostream>
+#include <typeinfo>
 
 namespace stream {
 
@@ -38,19 +39,27 @@ template<typename T>
 class Stream {
 public:
     // TODO: // Constructor ??  // Move, copy ??  // Destructor ??
+    // TODO: thread safe?
+    // TODO: const methods?
+    // TODO: return value or reference?
+    // TODO: perfect forwarding?
 
-    // Returns new Stream anyway (even in case of empty)
     template<typename Transform, typename U =
         decltype(std::declval<Transform>()(std::declval<T>()))>
     Stream<U> map(Transform &&transform) {
-        Stream<U> s;
-        auto &v = *reinterpret_cast<std::vector<T>*>(values);
-        auto &sv = *reinterpret_cast<std::vector<U>*>(s.values);
-        sv.reserve(v.size());
-        for (auto it = v.begin(); it != v.end(); ++it) {
-            sv.push_back(transform(*it));
-        }
-        return s;
+        auto deferred = [] (Stream<T> *current_stream, Transform &&transform) {
+            auto vp = reinterpret_cast<std::vector<T>*>(current_stream->values);
+            auto svp = new std::vector<U>();
+            svp->reserve(vp->size());
+            for (auto it = vp->begin(); it != vp->end(); ++it) {
+                svp->push_back(transform(*it));
+            }
+            delete vp;
+            current_stream->values = svp;
+        };
+        defer_execution(deferred, this, std::forward<Transform>(transform));
+        execute();
+        return *reinterpret_cast<Stream<U>*>(this);
     }
 
     // TODO: figure out what to do in case of empty
@@ -186,6 +195,36 @@ private:
     std::queue<std::function<void()>> functions;
 
 private:
+    Stream(): values(reinterpret_cast<std::vector<T>*>(new std::vector<T>)) {}
+
+    template<typename Iterator, typename U =
+        typename std::iterator_traits<Iterator>::value_type>
+    Stream(Iterator begin, Iterator end) {
+        auto v = new std::vector<U>();
+        v->reserve(std::distance(begin, end));
+        v->insert(v->end(), begin, end);
+        values = reinterpret_cast<void*>(v);
+    }
+
+    // TODO: do correct forwarding of f
+    template<typename F, typename ...Args>
+    void defer_execution(F f, Args &&...args) {
+        functions.push(std::bind(f, std::forward<Args>(args)...));
+    }
+
+    void execute() {
+        while (!functions.empty()) {
+            functions.front()();
+            functions.pop();
+        }
+    }
+
+    template<typename U>
+    static U div_up(const U &a, const U &b) {
+        return (a + b - 1) / b;
+    }
+
+private:
     friend auto MakeStream<T>(std::initializer_list<T> init);
 
     template<typename Iterator>
@@ -202,23 +241,6 @@ private:
 
     template<typename U>
     friend class Stream;
-
-private:
-    Stream(): values(reinterpret_cast<std::vector<T>*>(new std::vector<T>)) {}
-
-    template<typename Iterator, typename U =
-        typename std::iterator_traits<Iterator>::value_type>
-    Stream(Iterator begin, Iterator end) {
-        auto v = new std::vector<U>();
-        v->reserve(std::distance(begin, end));
-        v->insert(v->end(), begin, end);
-        values = reinterpret_cast<void*>(v);
-    }
-
-    template<typename U>
-    static U div_up(const U &a, const U &b) {
-        return (a + b - 1) / b;
-    }
 };
 
 template<typename Iterator>
