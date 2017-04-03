@@ -13,7 +13,6 @@
 
 // TODO: remove me!!!
 #include <iostream>
-#include <typeinfo>
 
 namespace stream {
 
@@ -65,17 +64,18 @@ public:
     template<typename Transform, typename U =
         decltype(std::declval<Transform>()(std::declval<T>()))>
     Stream<U> &map(Transform &&transform) {
-        auto deferred = [] (Stream<T> *current_stream, Transform &&transform) {
-            auto vp = reinterpret_cast<std::vector<T>*>(current_stream->values);
+        auto deferred = [&] (void *current_stream) {
+            Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
+            auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
             auto svp = new std::vector<U>();
             svp->reserve(vp->size());
             for (auto it = vp->begin(); it != vp->end(); ++it) {
                 svp->push_back(transform(*it));
             }
             delete vp;
-            current_stream->values = svp;
+            cs->values = svp;
         };
-        defer_execution(deferred, this, std::forward<Transform>(transform));
+        functions.push(deferred);
         return *reinterpret_cast<Stream<U>*>(this);
     }
 
@@ -129,17 +129,18 @@ public:
 
     template<typename Predicate>
     Stream<T> &filter(Predicate &&predicate) {
-        auto deferred = [] (Stream<T> *current_stream, Predicate &&predicate) {
-            auto vp = reinterpret_cast<std::vector<T>*>(current_stream->values);
+        auto deferred = [&] (void *current_stream) {
+            Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
+            auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
             auto svp = new std::vector<T>();
             for (auto it = vp->begin(); it != vp->end(); ++it) {
                 auto &v = *it;
                 if (predicate(v)) svp->push_back(v);
             }
             delete vp;
-            current_stream->values = svp;
+            cs->values = svp;
         };
-        defer_execution(deferred, this, std::forward<Predicate>(predicate));
+        functions.push(deferred);
         return *this;
     }
 
@@ -156,18 +157,20 @@ public:
 
     Stream<T> &skip(const size_t amount) {
         // TODO: some checks for amount value
-        auto deferred = [] (Stream<T> *current_stream, const size_t amount) {
-            auto vp = reinterpret_cast<std::vector<T>*>(current_stream->values);
+        auto deferred = [=] (void *current_stream) {
+            Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
+            auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
             vp->erase(vp->begin(), vp->begin() + amount);
         };
-        defer_execution(deferred, this, amount);
+        functions.push(deferred);
         return *this;
     }
 
     // TODO: figure out what to do in case of N=0
     Stream<Stream<T>> &group(const size_t N) {
-        auto deferred = [] (Stream<T> *current_stream, const size_t N) {
-            auto vp = reinterpret_cast<std::vector<T>*>(current_stream->values);
+        auto deferred = [=] (void *current_stream) {
+            Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
+            auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
             auto svp = new std::vector<Stream<T>>(); // TODO here and everywhere else
             // Do we really need () ???????
             // TODO: we dont want to reserve a lot of memory
@@ -180,9 +183,9 @@ public:
                 if (it >= vp->end()) break;
             }
             delete vp;
-            current_stream->values = svp;
+            cs->values = svp;
         };
-        defer_execution(deferred, this, N);
+        functions.push(deferred);
         return *reinterpret_cast<Stream<Stream<T>>*>(this);
     }
 
@@ -226,20 +229,14 @@ public:
 private:
     enum { is_stream = 1 };
     void *values;
-    std::queue<std::function<void()>> functions;
+    std::queue<std::function<void(void*)>> functions;
 
 private:
     Stream(): values(reinterpret_cast<std::vector<T>*>(new std::vector<T>)) {}
 
-    // TODO: do correct forwarding of f
-    template<typename F, typename ...Args>
-    void defer_execution(F f, Args &&...args) {
-        functions.push(std::bind(f, std::forward<Args>(args)...));
-    }
-
     void execute() {
         while (!functions.empty()) {
-            functions.front()();
+            functions.front()(this);
             functions.pop();
         }
     }
