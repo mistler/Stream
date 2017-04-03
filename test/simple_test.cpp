@@ -159,24 +159,6 @@ TEST(StreamTest, pipeOperatorToVector) {
 }
 #endif
 
-TEST(StreamTest, groupDivisible) {
-    auto vec = std::vector<int>{0, 1, 2, 3, 4, 5};
-    auto s = MakeStream(vec);
-    auto s_g = s.group(2);
-    for (size_t i = 0; i < vec.size(); ++i) {
-        EXPECT_EQ(vec[i], s_g.nth(i/2).nth(i%2));
-    }
-}
-
-TEST(StreamTest, groupWithReminder) {
-    auto vec = std::vector<int>{0, 1, 2, 3, 4};
-    auto s = MakeStream(vec);
-    auto s_g = s.group(2);
-    for (size_t i = 0; i < vec.size(); ++i) {
-        EXPECT_EQ(vec[i], s_g.nth(i/2).nth(i%2));
-    }
-}
-
 #if 0
 template<typename GenType>
 struct SimpleGenerator {
@@ -201,14 +183,27 @@ TEST(StreamTest, skip) {
     }
 }
 
-TEST(StreamTest, sum) {
-    auto vec = std::vector<int>{0, 1, 2, 3, 4};
-    auto s = MakeStream(vec.begin(), vec.end());
-    int sum;
-    for (const int &t : vec) {
-        sum += t;
+TEST(StreamTest, groupDivisible) {
+    auto vec = std::vector<int>{0, 1, 2, 3, 4, 5};
+    auto s = MakeStream(vec);
+    auto s_g = s.group(2);
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_EQ(vec[i], s_g.nth(i/2).nth(i%2));
     }
-    EXPECT_EQ(sum, s.sum().nth(0));
+}
+
+TEST(StreamTest, groupWithReminder) {
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto s = MakeStream(vec);
+    auto s_g = s.group(2);
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_EQ(vec[i], s_g.nth(i/2).nth(i%2));
+    }
+}
+
+TEST(StreamTest, sum) {
+    auto s = MakeStream({0, 1, 2, 3, 4});
+    EXPECT_EQ(0+1+2+3+4, s.sum());
 }
 
 TEST(StreamTest, print_to) {

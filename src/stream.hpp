@@ -3,6 +3,7 @@
 
 #include <cstddef>
 
+#include <functional>
 #include <initializer_list>
 #include <iterator>
 #include <ostream>
@@ -43,9 +44,11 @@ public:
         decltype(std::declval<Transform>()(std::declval<T>()))>
     Stream<U> map(Transform &&transform) {
         Stream<U> s;
-        s.values.reserve(values.size());
-        for (auto it = values.begin(); it != values.end(); ++it) {
-            s.values.push_back(transform(*it));
+        auto &v = *reinterpret_cast<std::vector<T>*>(values);
+        auto &sv = *reinterpret_cast<std::vector<U>*>(s.values);
+        sv.reserve(v.size());
+        for (auto it = v.begin(); it != v.end(); ++it) {
+            sv.push_back(transform(*it));
         }
         return s;
     }
@@ -54,10 +57,11 @@ public:
     template<typename IdentityFn, typename Accumulator, typename U =
         decltype(std::declval<IdentityFn>()(std::declval<T>()))>
     U reduce(IdentityFn &&identityFn, Accumulator &&accum) {
-        auto begin = values.begin();
-        if (begin == values.end()) throw 1;
+        auto &v = *reinterpret_cast<std::vector<T>*>(values);
+        auto begin = v.begin();
+        if (begin == v.end()) throw 1;
         U total = identityFn(*(begin++));
-        for (auto it = begin; it != values.end(); ++it) {
+        for (auto it = begin; it != v.end(); ++it) {
             total = accum(total, *it);
         }
         return total;
@@ -67,11 +71,12 @@ public:
     // TODO: figure out what to do in case of empty
     template<typename Accumulator>
     T reduce(Accumulator &&accum) {
-        auto begin = values.begin();
-        if (begin == values.end()) throw 1;
+        auto &v = *reinterpret_cast<std::vector<T>*>(values);
+        auto begin = v.begin();
+        if (begin == v.end()) throw 1;
         // Copy to keep first element of Stream clean
         T total = *(begin++);
-        for (auto it = begin; it != values.end(); ++it) {
+        for (auto it = begin; it != v.end(); ++it) {
             total = accum(total, *it);
         }
         return total;
@@ -97,9 +102,11 @@ public:
     template<typename Predicate>
     Stream<T> filter(Predicate &&predicate) {
         Stream<T> s;
-        for (auto it = values.begin(); it != values.end(); ++it) {
+        auto &v = *reinterpret_cast<std::vector<T>*>(values);
+        auto &sv = *reinterpret_cast<std::vector<T>*>(s.values);
+        for (auto it = v.begin(); it != v.end(); ++it) {
             auto &v = *it;
-            if (predicate(v)) s.values.push_back(v);
+            if (predicate(v)) sv.push_back(v);
         }
         return s;
     }
@@ -116,7 +123,8 @@ public:
 
     Stream<T> skip(const size_t amount) {
         // TODO: some checks for amount value
-        values.erase(values.begin(), values.begin() + amount);
+        auto &v = *reinterpret_cast<std::vector<T>*>(values);
+        v.erase(v.begin(), v.begin() + amount);
         return *this;
     }
 
@@ -124,35 +132,39 @@ public:
     Stream<Stream<T>> group(const size_t N) {
         if (N == 0) throw 1;
         Stream<Stream<T>> s;
-        s.values.reserve(div_up(values.size(), N));
-        for (auto it = values.begin();;) {
+        auto &v = *reinterpret_cast<std::vector<T>*>(values);
+        auto &sv = *reinterpret_cast<std::vector<Stream<T>>*>(s.values);
+        sv.reserve(div_up(v.size(), N));
+        for (auto it = v.begin();;) {
             Stream<T> inside_stream = MakeStream(it, it+N);
-            s.values.push_back(inside_stream);
+            sv.push_back(inside_stream);
             it += N;
-            if (it >= values.end()) break;
+            if (it >= v.end()) break;
         }
         return s;
     }
 
     // Hope that we have operator+= for type T
-    // Returns unchanged Stream in case of empty
-    Stream<T> &sum() {
-        auto begin = values.begin();
-        if (begin == values.end()) return *this;
-        T &total = *(begin++);
-        for (auto it = begin; it != values.end(); ++it) {
+    // Hope that we have copy constructor for T
+    // TODO: figure out what to do with empty stream
+    T sum() {
+        auto &v = *reinterpret_cast<std::vector<T>*>(values);
+        auto begin = v.begin();
+        if (begin == v.end()) throw 1;
+        T total = *(begin++);
+        for (auto it = begin; it != v.end(); ++it) {
             total += *it;
         }
-        values.erase(begin, values.end());
-        return *this;
+        return total;
     }
 
     std::ostream &print_to(std::ostream &os, const char *delimiter = " ") {
         // TODO: here should be work with queue.
-        auto it = values.begin();
-        if (it == values.end()) return os;
+        auto &v = *reinterpret_cast<std::vector<T>*>(values);
+        auto it = v.begin();
+        if (it == v.end()) return os;
         os << *(it++);
-        for (; it != values.end(); ++it) {
+        for (; it != v.end(); ++it) {
             os << delimiter << *it;
         }
         return os;
@@ -160,18 +172,18 @@ public:
 
     std::vector<T> to_vector() {
         // TODO: here should be work with queue.
-        return values;
+        return *reinterpret_cast<std::vector<T>*>(values);
     }
 
     T nth(const size_t index) {
         // TODO: here should be work with queue.
-        return values[index];
+        return (*reinterpret_cast<std::vector<T>*>(values))[index];
     }
 
 private:
     enum { is_stream = 1 };
-    std::vector<T> values;
-    //std::queue<function<???>> actions_queue;
+    void *values;
+    std::queue<std::function<void()>> functions;
 
 private:
     friend auto MakeStream<T>(std::initializer_list<T> init);
@@ -192,12 +204,15 @@ private:
     friend class Stream;
 
 private:
-    Stream() {}
+    Stream(): values(reinterpret_cast<std::vector<T>*>(new std::vector<T>)) {}
 
-    template<typename Iterator>
+    template<typename Iterator, typename U =
+        typename std::iterator_traits<Iterator>::value_type>
     Stream(Iterator begin, Iterator end) {
-        values.reserve(std::distance(begin, end));
-        values.insert(values.end(), begin, end);
+        auto v = new std::vector<U>();
+        v->reserve(std::distance(begin, end));
+        v->insert(v->end(), begin, end);
+        values = reinterpret_cast<void*>(v);
     }
 
     template<typename U>
@@ -208,8 +223,8 @@ private:
 
 template<typename Iterator>
 auto MakeStream(Iterator begin, Iterator end) {
-    using t = typename std::iterator_traits<Iterator>::value_type;
-    return Stream<t>(begin, end);
+    using T = typename std::iterator_traits<Iterator>::value_type;
+    return Stream<T>(begin, end);
 }
 
 template<typename T>
