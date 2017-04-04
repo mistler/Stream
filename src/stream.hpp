@@ -13,20 +13,7 @@
 #include <type_traits>
 #include <vector>
 
-// Logging
-#ifdef STREAM_VERBOSE
-#include <iostream>
-#define LOG(str) do { \
-    std::cout << (str) << std::endl; \
-} while (false)
-
-#define LOGV(str, val) do { \
-    std::cout << (str) << ": " << (val) << std::endl; \
-} while (false)
-#else
-#define LOG(str)
-#define LOGV(str, val)
-#endif
+#include "logger.hpp"
 
 namespace stream {
 
@@ -76,6 +63,42 @@ auto MakeStream(Container &&cont) {
     return Stream<T>(vec);
 }
 
+struct to_vector_pipable {};
+struct map_pipable {};
+
+template<typename PipableType, typename Arg>
+struct pipable {};
+
+template<>
+struct pipable<to_vector_pipable, void> {
+    template<typename S>
+    auto apply_to(S &&s) {
+        return s.to_vector();
+    }
+    enum { is_pipable = 1 };
+};
+
+template<typename Arg>
+struct pipable<map_pipable, Arg> {
+    pipable(Arg &&arg): closure(arg) {}
+    template<typename S>
+    auto apply_to(S &&s) {
+        LOG("Pipable map: apply_to");
+        return s.map(closure);
+    }
+    enum { is_pipable = 1 }; // to distinguish pipable from lambdas
+    Arg closure;
+};
+
+pipable<to_vector_pipable, void> to_vector();
+
+template<typename Transform>
+pipable<map_pipable, Transform> map(Transform &&transform) {
+    LOG("Global: map");
+    return pipable<map_pipable, Transform>(std::forward<Transform>(transform));
+}
+
+// TODO: remove reinterpret casts using shared ptr functionality
 template<typename T>
 class Stream {
 public:
@@ -188,16 +211,22 @@ public:
         return Stream<T>(*this);
     }
 
-// TODO: implement me
-#if 0
+    // For pipable
     template<typename Func,
-        typename RetType =
-        decltype(std::declval<Func>()(std::declval<Stream<T>>())),
-        typename U = typename std::enable_if<RetType::is_stream, RetType>::type>
-    U operator|(const Func &f) {
-        return this->f();
+        typename S =
+            typename std::enable_if<Func::is_pipable == 1, Func>::type>
+    auto operator|(Func &&f) {
+        return f.template apply_to<Stream<T>>(std::move(*this));
     }
-#endif
+
+    // For transforms that can be applied on T
+    template<typename Func,
+        typename U = decltype(std::declval<Func>()(std::declval<T>())),
+        typename S =
+            typename std::enable_if<std::is_same<U, T>::value, U>::type>
+    Stream<S> operator|(Func &&f) {
+        return map(std::forward<Func>(f));
+    }
 
     // TODO: some checks for amount value
     Stream<T> skip(const size_t amount) {

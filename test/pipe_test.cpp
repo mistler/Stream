@@ -6,8 +6,9 @@
 
 using namespace stream;
 
-// TODO: enable me
-#if 0
+// helper functions
+static int square_int(int i) { return i*i; }
+
 TEST(Pipe, MapSquareInt) {
     int (*f)(int i) = square_int;
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
@@ -18,7 +19,6 @@ TEST(Pipe, MapSquareInt) {
 }
 
 TEST(Pipe, Lambda11SquareInt) {
-    int (*f)(int i) = square_int;
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec) | [](int x) { return x*x; };
     for (size_t i = 0; i < vec.size(); ++i) {
@@ -27,16 +27,13 @@ TEST(Pipe, Lambda11SquareInt) {
 }
 
 TEST(Pipe, Lambda14SquareInt) {
-    int (*f)(int i) = square_int;
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec) | [](auto x) { return x*x; };
     for (size_t i = 0; i < vec.size(); ++i) {
         EXPECT_EQ(vec[i]*vec[i], sv.nth(i));
     }
 }
-#endif
 
-#if 0
 TEST(Pipe, ToVector) {
     auto vec = std::vector<int>{0, 1, 2, 3, 4, 5};
     auto s = MakeStream(vec);
@@ -45,4 +42,3 @@ TEST(Pipe, ToVector) {
         EXPECT_EQ(vec[i], s_vec[i]);
     }
 }
-#endif
