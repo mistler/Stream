@@ -83,10 +83,6 @@ public:
         LOGV("Stream: constructor using pointer to values", v);
     }
 
-    ~Stream() {
-        LOG("Stream: destructor");
-    }
-
     template<typename U>
     Stream(const Stream<U> &s) {
         LOG("Stream: copy constructor");
@@ -121,9 +117,6 @@ public:
         functions = std::move(s.functions);
         return *this;
     }
-    // TODO: thread safe?
-    // TODO: const methods?
-    // TODO: return value or reference?
     // TODO: perfect forwarding?
 
     template<typename Transform, typename U =
@@ -145,7 +138,6 @@ public:
         return Stream<U>(*this);
     }
 
-    // TODO: figure out what to do in case of empty
     template<typename IdentityFn, typename Accumulator, typename U =
         decltype(std::declval<IdentityFn>()(std::declval<T>()))>
     U reduce(IdentityFn &&identityFn, Accumulator &&accum) {
@@ -162,8 +154,6 @@ public:
         return total;
     }
 
-    // TODO: extend it to support different than T return type
-    // TODO: figure out what to do in case of empty
     // Hope that we have copy constructor for type T
     template<typename Accumulator>
     T reduce(Accumulator &&accum) {
@@ -179,23 +169,6 @@ public:
         }
         return total;
     }
-#if 0
-    // TODO: figure out how to deduce Uundeduced
-    // Returns new Stream anyway (even in case of empty)
-    template<typename Accumulator, typename Uundeduced, typename U =
-        decltype(std::declval<Accumulator>()(
-                    std::declval<Uundeduced>(), std::declval<T>()))>
-    Stream<U> reduce(Accumulator &&accum) {
-        U total;
-        auto begin = values.begin();
-        if (begin == values.end()) return total;
-        total = accum(total, *(begin++));
-        for (auto it = begin; it != values.end(); ++it) {
-            total = accum(total, *it);
-        }
-        return total;
-    }
-#endif
 
     template<typename Predicate>
     Stream<T> filter(Predicate &&predicate) {
