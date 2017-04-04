@@ -6,6 +6,7 @@
 #include <functional>
 #include <initializer_list>
 #include <iterator>
+#include <memory>
 #include <ostream>
 #include <queue>
 #include <stdexcept>
@@ -77,7 +78,7 @@ auto MakeStream(Container &&cont) {
 template<typename T>
 class Stream {
 public:
-    Stream(void *v): values(v) {
+    Stream(std::vector<T> *v): values(v) {
         LOG("Stream: constructor using pointer to values");
     }
 
@@ -94,16 +95,15 @@ public:
 
     ~Stream() {
         LOG("Stream: destructor");
-        if (values) delete reinterpret_cast<std::vector<T>*>(values);
     }
 
     template<typename U>
     Stream(const Stream<U> &s) {
         LOG("Stream: copy constructor");
         auto svp = new std::vector<U>;
-        auto vp = reinterpret_cast<std::vector<U>*>(s.values);
+        auto vp = reinterpret_cast<std::vector<U>*>(s.values.get());
         svp->insert(svp->end(), vp->begin(), vp->end());
-        values = svp;
+        values.reset(svp);
         functions = s.functions;
     }
 
@@ -111,16 +111,15 @@ public:
     Stream(Stream<U> &&s) {
         LOG("Stream: move constructor");
         values = s.values;
-        s.values = nullptr;
         functions = std::move(s.functions);
     }
 
     Stream<T> &operator=(const Stream<T> &s) {
         LOG("Stream: assignment");
         auto svp = new std::vector<T>;
-        auto vp = reinterpret_cast<std::vector<T>*>(s.values);
+        auto vp = reinterpret_cast<std::vector<T>*>(s.values.get());
         svp->insert(svp->end(), vp->begin(), vp->end());
-        values = svp;
+        values.reset(svp);
         functions = s.functions;
         return *this;
     }
@@ -129,7 +128,6 @@ public:
     Stream<T> &operator=(Stream<U> &&s) {
         LOG("Stream: move assignment");
         values = s.values;
-        s.values = nullptr;
         functions = std::move(s.functions);
         return *this;
     }
@@ -146,14 +144,13 @@ public:
         auto deferred = [&] (void *current_stream) {
             LOG("Stream: deferred map execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
-            auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
+            auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             auto svp = new std::vector<U>;
             svp->reserve(vp->size());
             for (auto it = vp->begin(); it != vp->end(); ++it) {
                 svp->push_back(transform(*it));
             }
-            delete vp;
-            cs->values = svp;
+            cs->values.reset(svp);
         };
         functions.push(deferred);
         return *reinterpret_cast<Stream<U>*>(this);
@@ -165,7 +162,7 @@ public:
     U reduce(IdentityFn &&identityFn, Accumulator &&accum) {
         LOG("Stream: reduce with identity execution");
         execute();
-        auto &v = *reinterpret_cast<std::vector<T>*>(values);
+        auto &v = *reinterpret_cast<std::vector<T>*>(values.get());
         auto begin = v.begin();
         if (begin == v.end()) throw std::runtime_error(
                 "Empty stream in reduce function with identity");
@@ -183,7 +180,7 @@ public:
     T reduce(Accumulator &&accum) {
         LOG("Stream: reduce execution");
         execute();
-        auto &v = *reinterpret_cast<std::vector<T>*>(values);
+        auto &v = *reinterpret_cast<std::vector<T>*>(values.get());
         auto begin = v.begin();
         if (begin == v.end()) throw std::runtime_error(
                 "Empty stream in reduce function");
@@ -217,14 +214,13 @@ public:
         auto deferred = [&] (void *current_stream) {
             LOG("Stream: deferred filter execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
-            auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
+            auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             auto svp = new std::vector<T>;
             for (auto it = vp->begin(); it != vp->end(); ++it) {
                 auto &v = *it;
                 if (predicate(v)) svp->push_back(v);
             }
-            delete vp;
-            cs->values = svp;
+            cs->values.reset(svp);
         };
         functions.push(deferred);
         return *this;
@@ -247,7 +243,7 @@ public:
         auto deferred = [=] (void *current_stream) {
             LOG("Stream: deferred skip execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
-            auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
+            auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             vp->erase(vp->begin(), vp->begin() + amount);
         };
         functions.push(deferred);
@@ -261,7 +257,7 @@ public:
         auto deferred = [=] (void *current_stream) {
             LOG("Stream: deferred group execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
-            auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
+            auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             auto svp = new std::vector<Stream<T>>;
             // TODO: we dont want to reserve a lot of memory
             // It works not ok in case of input stream size = 1 and N = 100000
@@ -273,8 +269,7 @@ public:
                 it += N;
                 if (it >= vp->end()) break;
             }
-            delete vp;
-            cs->values = svp;
+            cs->values.reset(svp);
         };
         functions.push(deferred);
         return *reinterpret_cast<Stream<Stream<T>>*>(this);
@@ -287,7 +282,7 @@ public:
         LOG("Stream: sum");
         execute();
         LOG("Stream: actual sum execution");
-        auto vp = reinterpret_cast<std::vector<T>*>(values);
+        auto vp = reinterpret_cast<std::vector<T>*>(values.get());
         auto begin = vp->begin();
         if (begin == vp->end())
             throw std::runtime_error("Stream is empty in sum function");
@@ -302,7 +297,7 @@ public:
         LOG("Stream: print_to");
         execute();
         LOG("Stream: actual print_to execution");
-        auto vp = reinterpret_cast<std::vector<T>*>(values);
+        auto vp = reinterpret_cast<std::vector<T>*>(values.get());
         auto it = vp->begin();
         if (it == vp->end()) return os;
         os << *(it++);
@@ -316,19 +311,19 @@ public:
         LOG("Stream: to_vector");
         execute();
         LOG("Stream: actual to_vector execution");
-        return *reinterpret_cast<std::vector<T>*>(values);
+        return *reinterpret_cast<std::vector<T>*>(values.get());
     }
 
     T nth(const size_t index) {
         LOG("Stream: nth");
         execute();
         LOG("Stream: actual nth execution");
-        return (*reinterpret_cast<std::vector<T>*>(values))[index];
+        return (*reinterpret_cast<std::vector<T>*>(values.get()))[index];
     }
 
 private:
-    void *values = nullptr;
     std::queue<std::function<void(void*)>> functions;
+    std::shared_ptr<void> values;
 
 private:
     void execute() {
