@@ -19,8 +19,13 @@
 #define LOG(str) do { \
     std::cout << (str) << std::endl; \
 } while (false)
+
+#define LOGV(str, val) do { \
+    std::cout << (str) << ": " << (val) << std::endl; \
+} while (false)
 #else
 #define LOG(str)
+#define LOGV(str, val)
 #endif
 
 namespace stream {
@@ -69,29 +74,14 @@ auto MakeStream(Container &&cont) {
         vec->push_back(*it);
     }
     return Stream<T>(vec);
-    /*
-    return Stream<typename std::remove_reference<Container>::type::value_type>(
-            std::move(cont.begin()), std::move(cont.end()));
-            */
 }
 
 template<typename T>
 class Stream {
 public:
     Stream(std::vector<T> *v): values(v) {
-        LOG("Stream: constructor using pointer to values");
+        LOGV("Stream: constructor using pointer to values", v);
     }
-
-#if 0
-    template<typename Iterator, typename U =
-        typename std::iterator_traits<Iterator>::value_type>
-    Stream(Iterator begin, Iterator end) {
-        auto v = new std::vector<U>();
-        v->reserve(std::distance(begin, end));
-        v->insert(v->end(), begin, end);
-        values = reinterpret_cast<void*>(v);
-    }
-#endif
 
     ~Stream() {
         LOG("Stream: destructor");
@@ -131,7 +121,6 @@ public:
         functions = std::move(s.functions);
         return *this;
     }
-    // TODO: // Constructor ??  // Move, copy ??  // Destructor ??
     // TODO: thread safe?
     // TODO: const methods?
     // TODO: return value or reference?
@@ -139,7 +128,7 @@ public:
 
     template<typename Transform, typename U =
         decltype(std::declval<Transform>()(std::declval<T>()))>
-    Stream<U> &map(Transform &&transform) {
+    Stream<U> map(Transform &&transform) {
         LOG("Stream: map");
         auto deferred = [&] (void *current_stream) {
             LOG("Stream: deferred map execution");
@@ -153,7 +142,7 @@ public:
             cs->values.reset(svp);
         };
         functions.push(deferred);
-        return *reinterpret_cast<Stream<U>*>(this);
+        return Stream<U>(*this);
     }
 
     // TODO: figure out what to do in case of empty
@@ -209,7 +198,7 @@ public:
 #endif
 
     template<typename Predicate>
-    Stream<T> &filter(Predicate &&predicate) {
+    Stream<T> filter(Predicate &&predicate) {
         LOG("Stream: filter");
         auto deferred = [&] (void *current_stream) {
             LOG("Stream: deferred filter execution");
@@ -223,7 +212,7 @@ public:
             cs->values.reset(svp);
         };
         functions.push(deferred);
-        return *this;
+        return Stream<T>(*this);
     }
 
 // TODO: implement me
@@ -238,24 +227,23 @@ public:
 #endif
 
     // TODO: some checks for amount value
-    Stream<T> &skip(const size_t amount) {
-        LOG("Stream: skip");
+    Stream<T> skip(const size_t amount) {
+        LOGV("Stream: skip", amount);
         auto deferred = [=] (void *current_stream) {
-            LOG("Stream: deferred skip execution");
+            LOGV("Stream: deferred skip execution", amount);
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             vp->erase(vp->begin(), vp->begin() + amount);
         };
         functions.push(deferred);
-        return *this;
+        return Stream<T>(*this);
     }
 
-    // TODO: figure out what to do in case of N=0
-    Stream<Stream<T>> &group(const size_t N) {
-        LOG("Stream: group");
+    Stream<Stream<T>> group(const size_t N) {
+        LOGV("Stream: group", N);
         if (N == 0) throw std::runtime_error("N is 0 in group function");
         auto deferred = [=] (void *current_stream) {
-            LOG("Stream: deferred group execution");
+            LOGV("Stream: deferred group execution", N);
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             auto svp = new std::vector<Stream<T>>;
@@ -272,7 +260,7 @@ public:
             cs->values.reset(svp);
         };
         functions.push(deferred);
-        return *reinterpret_cast<Stream<Stream<T>>*>(this);
+        return Stream<Stream<T>>(*this);
     }
 
     // Hope that we have operator+= for type T
@@ -315,9 +303,9 @@ public:
     }
 
     T nth(const size_t index) {
-        LOG("Stream: nth");
+        LOGV("Stream: nth", index);
         execute();
-        LOG("Stream: actual nth execution");
+        LOGV("Stream: actual nth execution", index);
         return (*reinterpret_cast<std::vector<T>*>(values.get()))[index];
     }
 
