@@ -8,11 +8,19 @@
 #include <iterator>
 #include <ostream>
 #include <queue>
+#include <stdexcept>
 #include <type_traits>
 #include <vector>
 
-// TODO: remove me!!!
+// Logging
+#ifdef STREAM_VERBOSE
 #include <iostream>
+#define LOG(str) do { \
+    std::cout << (str) << std::endl; \
+} while (false)
+#else
+#define LOG(str)
+#endif
 
 namespace stream {
 
@@ -21,32 +29,57 @@ class Stream;
 
 template<typename Iterator>
 auto MakeStream(Iterator begin, Iterator end) {
+    LOG("MakeStream: Iterators");
     using T = typename std::iterator_traits<Iterator>::value_type;
-    return Stream<T>(begin, end);
+    std::vector<T> *vec = new std::vector<T>;
+    for (auto it = begin; it != end; ++it) {
+        vec->push_back(*it);
+    }
+    return Stream<T>(vec);
 }
 
 template<typename T>
 auto MakeStream(std::initializer_list<T> init) {
-    return Stream<T>(init.begin(), init.end());
+    LOG("MakeStream: Initializer list");
+    std::vector<T> *vec = new std::vector<T>;
+    for (auto it = init.begin(); it != init.end(); ++it) {
+        vec->push_back(*it);
+    }
+    return Stream<T>(vec);
 }
 
 template<typename Container>
 auto MakeStream(const Container &cont) {
-    return Stream<typename Container::value_type>(cont.begin(), cont.end());
+    LOG("MakeStream: const Containter &cont");
+    typedef typename Container::value_type T;
+    std::vector<T> *vec = new std::vector<T>;
+    for (auto it = cont.begin(); it != cont.end(); ++it) {
+        vec->push_back(*it);
+    }
+    return Stream<T>(vec);
 }
 
 template<typename Container>
 auto MakeStream(Container &&cont) {
+    LOG("MakeStream: Container &&cont");
+    typedef typename std::remove_reference<Container>::type::value_type T;
+    std::vector<T> *vec = new std::vector<T>;
+    for (auto it = cont.begin(); it != cont.end(); ++it) {
+        vec->push_back(*it);
+    }
+    return Stream<T>(vec);
+    /*
     return Stream<typename std::remove_reference<Container>::type::value_type>(
-            // TODO: really move iterators???
             std::move(cont.begin()), std::move(cont.end()));
+            */
 }
 
 template<typename T>
 class Stream {
 public:
+    Stream(void *v): values(v) {};
 
-    // TODO: make me private and fix clang compilation errors
+#if 0
     template<typename Iterator, typename U =
         typename std::iterator_traits<Iterator>::value_type>
     Stream(Iterator begin, Iterator end) {
@@ -54,6 +87,51 @@ public:
         v->reserve(std::distance(begin, end));
         v->insert(v->end(), begin, end);
         values = reinterpret_cast<void*>(v);
+    }
+#endif
+
+    ~Stream() {
+        std::stringstream ss;
+        ss << "Stream: destructor " << values;
+        LOG(ss.str());
+        if (values) delete reinterpret_cast<std::vector<T>*>(values);
+    }
+
+    template<typename U>
+    Stream(const Stream<U> &s) {
+        LOG("Stream: copy constructor");
+        auto svp = new std::vector<U>;
+        auto vp = reinterpret_cast<std::vector<U>*>(s.values);
+        svp->insert(svp->end(), vp->begin(), vp->end());
+        values = svp;
+        functions = s.functions;
+    }
+
+    template<typename U>
+    Stream(Stream<U> &&s) {
+        LOG("Stream: move constructor");
+        values = s.values;
+        s.values = nullptr;
+        functions = std::move(s.functions);
+    }
+
+    Stream<T> &operator=(const Stream<T> &s) {
+        LOG("Stream: assignment");
+        auto svp = new std::vector<T>;
+        auto vp = reinterpret_cast<std::vector<T>*>(s.values);
+        svp->insert(svp->end(), vp->begin(), vp->end());
+        values = svp;
+        functions = s.functions;
+        return *this;
+    }
+
+    template<typename U>
+    Stream<T> &operator=(Stream<U> &&s) {
+        LOG("Stream: move assignment");
+        values = s.values;
+        s.values = nullptr;
+        functions = std::move(s.functions);
+        return *this;
     }
     // TODO: // Constructor ??  // Move, copy ??  // Destructor ??
     // TODO: thread safe?
@@ -67,7 +145,7 @@ public:
         auto deferred = [&] (void *current_stream) {
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
-            auto svp = new std::vector<U>();
+            auto svp = new std::vector<U>;
             svp->reserve(vp->size());
             for (auto it = vp->begin(); it != vp->end(); ++it) {
                 svp->push_back(transform(*it));
@@ -86,7 +164,8 @@ public:
         execute();
         auto &v = *reinterpret_cast<std::vector<T>*>(values);
         auto begin = v.begin();
-        if (begin == v.end()) throw 1;
+        if (begin == v.end()) throw std::runtime_error(
+                "Empty stream in reduce function with identity");
         U total = identityFn(*(begin++));
         for (auto it = begin; it != v.end(); ++it) {
             total = accum(total, *it);
@@ -94,15 +173,16 @@ public:
         return total;
     }
 
-    // Hope that we have copy constructor for type T
     // TODO: extend it to support different than T return type
     // TODO: figure out what to do in case of empty
+    // Hope that we have copy constructor for type T
     template<typename Accumulator>
     T reduce(Accumulator &&accum) {
         execute();
         auto &v = *reinterpret_cast<std::vector<T>*>(values);
         auto begin = v.begin();
-        if (begin == v.end()) throw 1;
+        if (begin == v.end()) throw std::runtime_error(
+                "Empty stream in reduce function");
         T total = *(begin++);
         for (auto it = begin; it != v.end(); ++it) {
             total = accum(total, *it);
@@ -132,7 +212,7 @@ public:
         auto deferred = [&] (void *current_stream) {
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
-            auto svp = new std::vector<T>();
+            auto svp = new std::vector<T>;
             for (auto it = vp->begin(); it != vp->end(); ++it) {
                 auto &v = *it;
                 if (predicate(v)) svp->push_back(v);
@@ -155,8 +235,8 @@ public:
     }
 #endif
 
+    // TODO: some checks for amount value
     Stream<T> &skip(const size_t amount) {
-        // TODO: some checks for amount value
         auto deferred = [=] (void *current_stream) {
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
@@ -168,17 +248,18 @@ public:
 
     // TODO: figure out what to do in case of N=0
     Stream<Stream<T>> &group(const size_t N) {
+        if (N == 0) throw std::runtime_error("N is 0 in group function");
         auto deferred = [=] (void *current_stream) {
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
-            auto svp = new std::vector<Stream<T>>(); // TODO here and everywhere else
-            // Do we really need () ???????
+            auto svp = new std::vector<Stream<T>>;
             // TODO: we dont want to reserve a lot of memory
             // It works not ok in case of input stream size = 1 and N = 100000
             svp->reserve(div_up(vp->size(), N));
             for (auto it = vp->begin();;) {
-                Stream<T> inside_stream = MakeStream(it, it+N);
-                svp->push_back(inside_stream);
+                auto ivp = new std::vector<T>;
+                ivp->insert(ivp->end(), it, it+N);
+                svp->push_back(std::move(Stream<T>(ivp)));
                 it += N;
                 if (it >= vp->end()) break;
             }
@@ -196,7 +277,8 @@ public:
         execute();
         auto vp = reinterpret_cast<std::vector<T>*>(values);
         auto begin = vp->begin();
-        if (begin == vp->end()) throw 1;
+        if (begin == vp->end())
+            throw std::runtime_error("Stream is empty in sum function");
         T total = *(begin++);
         for (auto it = begin; it != vp->end(); ++it) {
             total += *it;
@@ -227,8 +309,7 @@ public:
     }
 
 private:
-    enum { is_stream = 1 };
-    void *values;
+    void *values = nullptr;
     std::queue<std::function<void(void*)>> functions;
 
 private:
