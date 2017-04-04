@@ -5,8 +5,8 @@ COPTS = [
 
 cc_library (
     name = "stream",
-    hdrs = ["stream.hpp", "logger.hpp"],
-    srcs = ["stream.cpp"],
+    hdrs = ["stream.hpp", "logger.hpp", "stream_operator.hpp"],
+    srcs = ["stream_operator.cpp"],
     visibility = ["//test:__pkg__"],
     copts = COPTS,
 )

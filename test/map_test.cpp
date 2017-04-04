@@ -23,6 +23,15 @@ TEST(Map, SquareInt) {
     }
 }
 
+TEST(Map, PipeSquareInt) {
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
+    int (*f)(int i) = square_int;
+    auto sv = MakeStream(vec) | map(f);
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_EQ(vec[i]*vec[i], sv.nth(i));
+    }
+}
+
 TEST(Map, HalfIntAsFloat) {
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec);

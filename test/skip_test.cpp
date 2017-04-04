@@ -16,3 +16,13 @@ TEST(Skip, SimpleSkip) {
         EXPECT_EQ(vec[i], s.nth(i-skip));
     }
 }
+
+TEST(Skip, PipeSkip) {
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
+    constexpr int skip_s = 2;
+    const int vlen = vec.size();
+    auto s = MakeStream(vec.begin(), vec.end()) | skip(skip_s);
+    for (int i = skip_s; i < vlen; i++) {
+        EXPECT_EQ(vec[i], s.nth(i-skip_s));
+    }
+}

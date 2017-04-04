@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 
 #include "src/stream.hpp"
+#include <iostream>
 
 using namespace stream;
 

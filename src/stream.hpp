@@ -13,6 +13,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "stream_operator.hpp"
 #include "logger.hpp"
 
 namespace stream {
@@ -61,41 +62,6 @@ auto MakeStream(Container &&cont) {
         vec->push_back(*it);
     }
     return Stream<T>(vec);
-}
-
-struct to_vector_pipable {};
-struct map_pipable {};
-
-template<typename PipableType, typename Arg>
-struct pipable {};
-
-template<>
-struct pipable<to_vector_pipable, void> {
-    template<typename S>
-    auto apply_to(S &&s) {
-        return s.to_vector();
-    }
-    enum { is_pipable = 1 };
-};
-
-template<typename Arg>
-struct pipable<map_pipable, Arg> {
-    pipable(Arg &&arg): closure(arg) {}
-    template<typename S>
-    auto apply_to(S &&s) {
-        LOG("Pipable map: apply_to");
-        return s.map(closure);
-    }
-    enum { is_pipable = 1 }; // to distinguish pipable from lambdas
-    Arg closure;
-};
-
-pipable<to_vector_pipable, void> to_vector();
-
-template<typename Transform>
-pipable<map_pipable, Transform> map(Transform &&transform) {
-    LOG("Global: map");
-    return pipable<map_pipable, Transform>(std::forward<Transform>(transform));
 }
 
 // TODO: remove reinterpret casts using shared ptr functionality
@@ -211,11 +177,11 @@ public:
         return Stream<T>(*this);
     }
 
-    // For pipable
+    // For StreamOperator
     template<typename Func,
-        typename S =
-            typename std::enable_if<Func::is_pipable == 1, Func>::type>
-    auto operator|(Func &&f) {
+        typename S = typename std::enable_if<
+            std::is_base_of<StreamOperator, Func>::value, Func>::type>
+    decltype(auto) operator|(Func &&f) {
         return f.template apply_to<Stream<T>>(std::move(*this));
     }
 

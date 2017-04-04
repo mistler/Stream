@@ -19,3 +19,15 @@ TEST(PrintTo, StringStream) {
         EXPECT_EQ(expected, actual);
     }
 }
+
+TEST(PrintTo, PipeStringStream) {
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
+    std::stringstream ss;
+    MakeStream(vec.begin(), vec.end()) | print_to(ss);
+    for (auto it = vec.begin(); it != vec.end(); ++it) {
+        int actual, expected;
+        expected = *it;
+        ss >> actual;
+        EXPECT_EQ(expected, actual);
+    }
+}
