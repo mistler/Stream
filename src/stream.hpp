@@ -77,7 +77,9 @@ auto MakeStream(Container &&cont) {
 template<typename T>
 class Stream {
 public:
-    Stream(void *v): values(v) {};
+    Stream(void *v): values(v) {
+        LOG("Stream: constructor using pointer to values");
+    }
 
 #if 0
     template<typename Iterator, typename U =
@@ -91,9 +93,7 @@ public:
 #endif
 
     ~Stream() {
-        std::stringstream ss;
-        ss << "Stream: destructor " << values;
-        LOG(ss.str());
+        LOG("Stream: destructor");
         if (values) delete reinterpret_cast<std::vector<T>*>(values);
     }
 
@@ -142,7 +142,9 @@ public:
     template<typename Transform, typename U =
         decltype(std::declval<Transform>()(std::declval<T>()))>
     Stream<U> &map(Transform &&transform) {
+        LOG("Stream: map");
         auto deferred = [&] (void *current_stream) {
+            LOG("Stream: deferred map execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
             auto svp = new std::vector<U>;
@@ -161,6 +163,7 @@ public:
     template<typename IdentityFn, typename Accumulator, typename U =
         decltype(std::declval<IdentityFn>()(std::declval<T>()))>
     U reduce(IdentityFn &&identityFn, Accumulator &&accum) {
+        LOG("Stream: reduce with identity execution");
         execute();
         auto &v = *reinterpret_cast<std::vector<T>*>(values);
         auto begin = v.begin();
@@ -178,6 +181,7 @@ public:
     // Hope that we have copy constructor for type T
     template<typename Accumulator>
     T reduce(Accumulator &&accum) {
+        LOG("Stream: reduce execution");
         execute();
         auto &v = *reinterpret_cast<std::vector<T>*>(values);
         auto begin = v.begin();
@@ -209,7 +213,9 @@ public:
 
     template<typename Predicate>
     Stream<T> &filter(Predicate &&predicate) {
+        LOG("Stream: filter");
         auto deferred = [&] (void *current_stream) {
+            LOG("Stream: deferred filter execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
             auto svp = new std::vector<T>;
@@ -237,7 +243,9 @@ public:
 
     // TODO: some checks for amount value
     Stream<T> &skip(const size_t amount) {
+        LOG("Stream: skip");
         auto deferred = [=] (void *current_stream) {
+            LOG("Stream: deferred skip execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
             vp->erase(vp->begin(), vp->begin() + amount);
@@ -248,8 +256,10 @@ public:
 
     // TODO: figure out what to do in case of N=0
     Stream<Stream<T>> &group(const size_t N) {
+        LOG("Stream: group");
         if (N == 0) throw std::runtime_error("N is 0 in group function");
         auto deferred = [=] (void *current_stream) {
+            LOG("Stream: deferred group execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values);
             auto svp = new std::vector<Stream<T>>;
@@ -274,7 +284,9 @@ public:
     // Hope that we have copy constructor for T
     // TODO: figure out what to do with empty stream
     T sum() {
+        LOG("Stream: sum");
         execute();
+        LOG("Stream: actual sum execution");
         auto vp = reinterpret_cast<std::vector<T>*>(values);
         auto begin = vp->begin();
         if (begin == vp->end())
@@ -287,7 +299,9 @@ public:
     }
 
     std::ostream &print_to(std::ostream &os, const char *delimiter = " ") {
+        LOG("Stream: print_to");
         execute();
+        LOG("Stream: actual print_to execution");
         auto vp = reinterpret_cast<std::vector<T>*>(values);
         auto it = vp->begin();
         if (it == vp->end()) return os;
@@ -299,12 +313,16 @@ public:
     }
 
     std::vector<T> to_vector() {
+        LOG("Stream: to_vector");
         execute();
+        LOG("Stream: actual to_vector execution");
         return *reinterpret_cast<std::vector<T>*>(values);
     }
 
     T nth(const size_t index) {
+        LOG("Stream: nth");
         execute();
+        LOG("Stream: actual nth execution");
         return (*reinterpret_cast<std::vector<T>*>(values))[index];
     }
 
