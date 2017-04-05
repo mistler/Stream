@@ -26,6 +26,7 @@ struct OperatorMap: public StreamOperator {
     auto apply_to(S &&s) {
         return s.map(_transform);
     }
+private:
     Transform _transform;
 };
 
@@ -39,6 +40,7 @@ struct OperatorReduce<Accumulator>: public StreamOperator {
     auto apply_to(S &&s) {
         return s.reduce(_accum);
     }
+private:
     Accumulator _accum;
 };
 
@@ -51,6 +53,7 @@ struct OperatorReduce<IdentityFn, Accumulator>: public StreamOperator {
     auto apply_to(S &&s) {
         return s.reduce(_identityFn, _accum);
     }
+private:
     IdentityFn _identityFn;
     Accumulator _accum;
 };
@@ -62,6 +65,7 @@ struct OperatorFilter: public StreamOperator {
     auto apply_to(S &&s) {
         return s.filter(_predicate);
     }
+private:
     Predicate _predicate;
 };
 
@@ -71,6 +75,7 @@ struct OperatorSkip: public StreamOperator {
     auto apply_to(S &&s) {
         return s.skip(_amount);
     }
+private:
     size_t _amount;
 };
 
@@ -80,6 +85,7 @@ struct OperatorGroup: public StreamOperator {
     auto apply_to(S &&s) {
         return s.group(_N);
     }
+private:
     size_t _N;
 };
 
@@ -98,6 +104,7 @@ struct OperatorPrintTo: public StreamOperator {
     auto &apply_to(S &&s) {
         return s.print_to(_os, _delimiter);
     }
+private:
     std::ostream &_os;
     const char *_delimiter;
 };
@@ -108,6 +115,7 @@ struct OperatorNth: public StreamOperator {
     auto apply_to(S &&s) {
         return s.nth(_index);
     }
+private:
     size_t _index;
 };
 

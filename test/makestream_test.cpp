@@ -43,15 +43,25 @@ TEST(MakeStream, FromContainerMove) {
     UNUSED(sv);
 }
 
-// TODO: enable me
-#if 0
 template<typename GenType>
 struct SimpleGenerator {
     GenType operator()() { return GenType(); };
 };
 TEST(MakeStream, MakeStreamWithGenerator) {
-    auto &&gen = SimpleGenerator<float>();
-    auto s = MakeStream(gen);
-    UNUSED(s);
+    auto s1 = MakeStream(SimpleGenerator<float>());
+    auto s2 = MakeStream([] () { return 3; });
+    UNUSED(s1);
+    UNUSED(s2);
 }
-#endif
+
+TEST(MakeStream, MakeStreamVariadic) {
+    auto sint2 = MakeStream(3, 4);
+    auto sint3 = MakeStream(3, 4, 5);
+    auto sint4 = MakeStream(3, 4, 5, 6);
+    auto sfloat = MakeStream(3.f, 4.f, 5.f);
+
+    UNUSED(sint2);
+    UNUSED(sint3);
+    UNUSED(sint4);
+    UNUSED(sfloat);
+}

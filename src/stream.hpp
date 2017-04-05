@@ -15,16 +15,17 @@
 
 #include "stream_operator.hpp"
 #include "logger.hpp"
+#include "type_helpers.hpp"
 
 namespace stream {
 
 template<typename T>
 class Stream;
 
-template<typename Iterator>
+template<typename Iterator,
+    typename T = typename std::iterator_traits<Iterator>::value_type>
 auto MakeStream(Iterator begin, Iterator end) {
     LOG("MakeStream: Iterators");
-    using T = typename std::iterator_traits<Iterator>::value_type;
     std::vector<T> *vec = new std::vector<T>;
     for (auto it = begin; it != end; ++it) {
         vec->push_back(*it);
@@ -39,10 +40,12 @@ auto MakeStream(std::initializer_list<T> init) {
     return Stream<T>(vec);
 }
 
-template<typename Container>
+template<typename Container,
+    typename T = typename std::remove_reference<Container>::type::value_type,
+    typename U = typename std::enable_if<
+        is_container<Container>::value, Container>::type>
 auto MakeStream(const Container &cont) {
     LOG("MakeStream: const Containter &cont");
-    typedef typename Container::value_type T;
     std::vector<T> *vec = new std::vector<T>;
     for (auto it = cont.begin(); it != cont.end(); ++it) {
         vec->push_back(*it);
@@ -50,21 +53,63 @@ auto MakeStream(const Container &cont) {
     return Stream<T>(vec);
 }
 
-template<typename Container>
+template<typename Container,
+    typename T = typename std::remove_reference<Container>::type::value_type,
+    typename U = typename std::enable_if<
+        is_container<Container>::value, Container>::type>
 auto MakeStream(Container &&cont) {
     LOG("MakeStream: Container &&cont");
-    typedef typename std::remove_reference<Container>::type::value_type T;
     std::vector<T> *vec = new std::vector<T>;
     for (auto it = cont.begin(); it != cont.end(); ++it) {
         vec->push_back(*it);
     }
     return Stream<T>(vec);
+}
+
+template<typename Generator,
+    typename T = decltype(std::declval<Generator>()())>
+auto MakeStream(Generator &&generator) {
+    LOG("MakeStream: Generator &&genereator");
+    std::vector<T> *vec = new std::vector<T>{ generator() };
+    return Stream<T>(vec);
+}
+
+template<typename S, typename Arg, typename Unused1 = void,
+    typename T = typename std::enable_if<
+        std::is_same<S, Stream<Arg>>::value, Arg>::type>
+auto MakeStream(S &&s, Arg &&arg) {
+    s.append(std::forward<Arg>(arg));
+    return std::forward<S>(s);
+}
+
+template<typename S, typename Arg, typename ...Args,
+    typename T = typename std::enable_if<
+        std::is_same<S, Stream<Arg>>::value, Arg>::type>
+auto MakeStream(S &&s, Arg &&arg, Args &&...args) {
+    s.append(std::forward<Arg>(arg));
+    return MakeStream(std::forward<S>(s),
+                std::forward<Args>(args)...);
+}
+
+template<typename Arg1, typename Arg2, typename ...Args,
+    typename T = typename std::enable_if<
+        !std::is_same<Arg1, Stream<Arg2>>::value, Arg1>::type,
+        typename Unused1 = void>
+auto MakeStream(Arg1 &&arg1, Arg2 &&arg2, Args &&...args) {
+    LOG("MakeStream: variadic create");
+    std::vector<Arg1> *vec = new std::vector<Arg1>;
+    vec->push_back(arg1);
+    vec->push_back(arg2);
+    return MakeStream(Stream<Arg1>(vec), std::forward<Arg2>(arg2),
+            std::forward<Args>(args)...);
 }
 
 // TODO: remove reinterpret casts using shared ptr functionality
 template<typename T>
 class Stream {
 public:
+    enum { is_stream = 1 };
+    typedef T value_type;
 
     // TODO: make me private constructor
     Stream(std::vector<T> *v): values(v) {}
@@ -101,14 +146,18 @@ public:
         functions = std::move(s.functions);
         return *this;
     }
-    // TODO: perfect forwarding?
+
+    void append(T &&t) {
+        auto vp = reinterpret_cast<std::vector<T>*>(values.get());
+        vp->push_back(std::forward<T>(t));
+    }
 
     template<typename Transform, typename U =
         decltype(std::declval<Transform>()(std::declval<T>()))>
     Stream<U> map(Transform &&transform) {
         LOG("Stream: map");
         auto deferred = [&] (void *current_stream) {
-            LOG("Stream: deferred map execution");
+            LOG("Stream: map execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             auto svp = new std::vector<U>;
@@ -159,7 +208,7 @@ public:
     Stream<T> filter(Predicate &&predicate) {
         LOG("Stream: filter");
         auto deferred = [&] (void *current_stream) {
-            LOG("Stream: deferred filter execution");
+            LOG("Stream: filter execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             auto svp = new std::vector<T>;
@@ -195,7 +244,7 @@ public:
     Stream<T> skip(const size_t amount) {
         LOGV("Stream: skip", amount);
         auto deferred = [=] (void *current_stream) {
-            LOGV("Stream: deferred skip execution", amount);
+            LOGV("Stream: skip execution", amount);
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             vp->erase(vp->begin(), vp->begin() + amount);
@@ -209,7 +258,7 @@ public:
         LOGV("Stream: group", N);
         if (N == 0) throw std::runtime_error("N is 0 in group function");
         auto deferred = [=] (void *current_stream) {
-            LOGV("Stream: deferred group execution", N);
+            LOGV("Stream: group execution", N);
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             auto svp = new std::vector<Stream<T>>;
@@ -236,7 +285,7 @@ public:
     T sum() {
         LOG("Stream: sum");
         execute();
-        LOG("Stream: actual sum execution");
+        LOG("Stream: sum execution");
         auto vp = reinterpret_cast<std::vector<T>*>(values.get());
         auto begin = vp->begin();
         if (begin == vp->end())
@@ -251,7 +300,7 @@ public:
     std::ostream &print_to(std::ostream &os, const char *delimiter = " ") {
         LOG("Stream: print_to");
         execute();
-        LOG("Stream: actual print_to execution");
+        LOG("Stream: print_to execution");
         auto vp = reinterpret_cast<std::vector<T>*>(values.get());
         auto it = vp->begin();
         if (it == vp->end()) return os;
@@ -265,14 +314,14 @@ public:
     std::vector<T> to_vector() {
         LOG("Stream: to_vector");
         execute();
-        LOG("Stream: actual to_vector execution");
+        LOG("Stream: to_vector execution");
         return *reinterpret_cast<std::vector<T>*>(values.get());
     }
 
     T nth(const size_t index) {
         LOGV("Stream: nth", index);
         execute();
-        LOGV("Stream: actual nth execution", index);
+        LOGV("Stream: nth execution", index);
         return (*reinterpret_cast<std::vector<T>*>(values.get()))[index];
     }
 
@@ -328,53 +377,6 @@ private:
     template<typename U>
     friend class Stream;
 };
-
-#if 0
-// Actually checks if class contains const interator
-template<typename T>
-class is_container {
-    typedef float s;
-    typedef double d;
-
-    template<typename C> static s test(typename C::const_iterator*);
-    template<typename C> static d test(...);
-
-public:
-    enum { value = sizeof(test<T>(0)) == sizeof(s) };
-};
-
-template<typename Container, typename T =
-std::enable_if<is_container<Container>::value, Container>>
-auto MakeStream(T &&cont) {
-    return Stream<typename std::remove_reference<T>::type::value_type>(
-            // TODO: really move iterators???
-            std::move(cont.begin()), std::move(cont.end()));
-}
-
-template<typename T>
-class is_generator {
-    typedef float s;
-    typedef double d;
-
-    template<typename C> static s test(decltype(&C::operator()));
-    template<typename C> static d test(...);
-
-public:
-    enum { value = sizeof(test<T>(0)) == sizeof(s) };
-};
-
-template<typename Generator>
-auto MakeStream(Generator &&generator) {
-    std::cout << "GENERATOR" << std::endl;
-    auto &&generated = generator();
-    Stream<typename std::remove_reference<decltype(generated)>::type> s;
-    s.values.push_back(std::move(s));
-}
-#endif
-
-/*
-auto MakeStream(value1, value2, ...);
-*/
 
 } // namespace stream
 
