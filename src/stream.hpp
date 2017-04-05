@@ -22,6 +22,8 @@ namespace stream {
 template<typename T>
 class Stream;
 
+struct DefaultStreamType {};
+
 template<typename Iterator,
     typename T = typename std::iterator_traits<Iterator>::value_type>
 auto MakeStream(Iterator begin, Iterator end) {
@@ -74,44 +76,37 @@ auto MakeStream(Generator &&generator) {
     return Stream<T>(vec);
 }
 
-template<typename S, typename Arg, typename Unused1 = void,
-    typename T = typename std::enable_if<
-        std::is_same<S, Stream<Arg>>::value, Arg>::type>
-auto MakeStream(S &&s, Arg &&arg) {
-    s.append(std::forward<Arg>(arg));
+namespace {
+
+template<typename S>
+auto MakeStreamVariadic(S &&s) {
     return std::forward<S>(s);
 }
 
-template<typename S, typename Arg, typename ...Args,
-    typename T = typename std::enable_if<
-        std::is_same<S, Stream<Arg>>::value, Arg>::type>
-auto MakeStream(S &&s, Arg &&arg, Args &&...args) {
+template<typename S, typename Arg, typename ...Args>
+static auto MakeStreamVariadic(S &&s, Arg &&arg, Args &&...args) {
     s.append(std::forward<Arg>(arg));
-    return MakeStream(std::forward<S>(s),
+    return MakeStreamVariadic(std::forward<S>(s),
                 std::forward<Args>(args)...);
 }
 
-template<typename Arg1, typename Arg2, typename ...Args,
-    typename T = typename std::enable_if<
-        !std::is_same<Arg1, Stream<Arg2>>::value, Arg1>::type,
-        typename Unused1 = void>
-auto MakeStream(Arg1 &&arg1, Arg2 &&arg2, Args &&...args) {
+} // namespace
+
+template<typename Arg, typename ...Args,
+    typename U = typename std::enable_if<is_container<
+        typename std::remove_reference<Arg>::type>::value == 0, Arg>::type>
+auto MakeStream(Arg &&arg, Args &&...args) {
     LOG("MakeStream: variadic create");
-    std::vector<Arg1> *vec = new std::vector<Arg1>;
-    vec->push_back(arg1);
-    vec->push_back(arg2);
-    return MakeStream(Stream<Arg1>(vec), std::forward<Arg2>(arg2),
-            std::forward<Args>(args)...);
+    std::vector<Arg> *vec = new std::vector<Arg>;
+    vec->push_back(arg);
+    return MakeStreamVariadic(Stream<Arg>(vec), std::forward<Args>(args)...);
 }
 
-// TODO: remove reinterpret casts using shared ptr functionality
+Stream<DefaultStreamType> MakeStream();
+
 template<typename T>
 class Stream {
 public:
-    enum { is_stream = 1 };
-    typedef T value_type;
-
-    // TODO: make me private constructor
     Stream(std::vector<T> *v): values(v) {}
     ~Stream() { LOG("Stream: destructor"); }
 

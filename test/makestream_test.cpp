@@ -55,11 +55,15 @@ TEST(MakeStream, MakeStreamWithGenerator) {
 }
 
 TEST(MakeStream, MakeStreamVariadic) {
+    auto sint = MakeStream();
+    auto sint1 = MakeStream(3);
     auto sint2 = MakeStream(3, 4);
     auto sint3 = MakeStream(3, 4, 5);
     auto sint4 = MakeStream(3, 4, 5, 6);
     auto sfloat = MakeStream(3.f, 4.f, 5.f);
 
+    UNUSED(sint);
+    UNUSED(sint1);
     UNUSED(sint2);
     UNUSED(sint3);
     UNUSED(sint4);

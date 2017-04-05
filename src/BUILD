@@ -11,7 +11,7 @@ cc_library (
             "stream_operator.hpp",
             "type_helpers.hpp",
     ],
-    srcs = ["stream_operator.cpp"],
+    srcs = ["stream_operator.cpp", "stream.cpp"],
     visibility = ["//test:__pkg__"],
     copts = COPTS,
 )
