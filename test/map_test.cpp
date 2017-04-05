@@ -23,6 +23,20 @@ TEST(Map, SquareInt) {
     }
 }
 
+TEST(Map, SquareIntTwoStreams) {
+    auto vec = std::vector<int>{0, 1, 2, 3, 4};
+    auto sv = MakeStream(vec);
+    int (*f)(int i) = square_int;
+    auto sv1 = sv.map(f);
+    auto sv2 = sv.map(f);
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_EQ(vec[i]*vec[i], sv1.nth(i));
+    }
+    for (size_t i = 0; i < vec.size(); ++i) {
+        EXPECT_EQ(vec[i]*vec[i], sv2.nth(i));
+    }
+}
+
 TEST(Map, PipeSquareInt) {
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
     int (*f)(int i) = square_int;
@@ -46,9 +60,9 @@ TEST(Map, SquareIntLambdaPassByValue) {
     auto vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec);
     auto tt = [](auto x) { return x*x; };
-    sv = sv.map(tt);
+    auto svv = sv.map(tt);
     for (size_t i = 0; i < vec.size(); ++i) {
-        EXPECT_EQ(vec[i]*vec[i], sv.nth(i));
+        EXPECT_EQ(vec[i]*vec[i], svv.nth(i));
     }
 }
 

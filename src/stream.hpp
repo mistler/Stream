@@ -35,10 +35,7 @@ auto MakeStream(Iterator begin, Iterator end) {
 template<typename T>
 auto MakeStream(std::initializer_list<T> init) {
     LOG("MakeStream: Initializer list");
-    std::vector<T> *vec = new std::vector<T>;
-    for (auto it = init.begin(); it != init.end(); ++it) {
-        vec->push_back(*it);
-    }
+    std::vector<T> *vec = new std::vector<T>(std::move(init));
     return Stream<T>(vec);
 }
 
@@ -68,22 +65,21 @@ auto MakeStream(Container &&cont) {
 template<typename T>
 class Stream {
 public:
-    Stream(std::vector<T> *v): values(v) {
-        LOGV("Stream: constructor using pointer to values", v);
-    }
 
-    template<typename U>
-    Stream(const Stream<U> &s) {
+    // TODO: make me private constructor
+    Stream(std::vector<T> *v): values(v) {}
+    ~Stream() { LOG("Stream: destructor"); }
+
+    Stream(const Stream<T> &s) {
         LOG("Stream: copy constructor");
-        auto svp = new std::vector<U>;
-        auto vp = reinterpret_cast<std::vector<U>*>(s.values.get());
+        auto svp = new std::vector<T>;
+        auto vp = reinterpret_cast<std::vector<T>*>(s.values.get());
         svp->insert(svp->end(), vp->begin(), vp->end());
         values.reset(svp);
         functions = s.functions;
     }
 
-    template<typename U>
-    Stream(Stream<U> &&s) {
+    Stream(Stream<T> &&s) {
         LOG("Stream: move constructor");
         values = s.values;
         functions = std::move(s.functions);
@@ -99,8 +95,7 @@ public:
         return *this;
     }
 
-    template<typename U>
-    Stream<T> &operator=(Stream<U> &&s) {
+    Stream<T> &operator=(Stream<T> &&s) {
         LOG("Stream: move assignment");
         values = s.values;
         functions = std::move(s.functions);
@@ -123,8 +118,9 @@ public:
             }
             cs->values.reset(svp);
         };
-        functions.push(deferred);
-        return Stream<U>(*this);
+        auto s = Stream<U>(*this);
+        s.functions.push(deferred);
+        return s;
     }
 
     template<typename IdentityFn, typename Accumulator, typename U =
@@ -173,8 +169,9 @@ public:
             }
             cs->values.reset(svp);
         };
-        functions.push(deferred);
-        return Stream<T>(*this);
+        auto s = Stream<T>(*this);
+        s.functions.push(deferred);
+        return s;
     }
 
     // For StreamOperator
@@ -203,8 +200,9 @@ public:
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             vp->erase(vp->begin(), vp->begin() + amount);
         };
-        functions.push(deferred);
-        return Stream<T>(*this);
+        auto s = Stream<T>(*this);
+        s.functions.push(deferred);
+        return s;
     }
 
     Stream<Stream<T>> group(const size_t N) {
@@ -227,8 +225,9 @@ public:
             }
             cs->values.reset(svp);
         };
-        functions.push(deferred);
-        return Stream<Stream<T>>(*this);
+        auto s = Stream<Stream<T>>(*this);
+        s.functions.push(deferred);
+        return s;
     }
 
     // Hope that we have operator+= for type T
@@ -287,6 +286,23 @@ private:
             functions.front()(this);
             functions.pop();
         }
+    }
+
+    Stream(const std::shared_ptr<void> &p): values(p) {}
+
+    explicit operator Stream<Stream<T>>() {
+        LOG("Stream: explicit cast to Stream<Stream<T>>");
+        Stream<Stream<T>> s(this->values);
+        s.functions = std::move(this->functions);
+        return s;
+    }
+
+    template<typename U>
+    explicit operator Stream<U>() {
+        LOG("Stream: explicit cast from Stream<T> to Stream<U>");
+        Stream<U> s(this->values);
+        s.functions = std::move(this->functions);
+        return s;
     }
 
     template<typename U>

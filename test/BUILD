@@ -20,6 +20,7 @@ cc_test(
             "group_test.cpp",
             "pipe_test.cpp",
             "simple_test.cpp",
+            "perfectforwarding_test.cpp",
     ],
     copts = GTEST_COPTS,
     deps = [
