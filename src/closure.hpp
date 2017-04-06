@@ -7,46 +7,40 @@ namespace stream {
 
 template<typename T>
 struct closure_wrapper {
-    constexpr explicit closure_wrapper(T&& v) noexcept(
-        std::is_nothrow_move_constructible<std::remove_const_t<T>>{})
-        : val_(std::move(v)) {}
-    constexpr T&& get() const noexcept { return std::move(val_); }
-
+    constexpr explicit closure_wrapper(T&& v): _val(std::move(v)) {}
+    constexpr T&& get() const{ return std::move(_val); }
 private:
-    static_assert(not std::is_rvalue_reference<T>{}, "");
-    std::remove_const_t<T> mutable val_;
+    static_assert(not std::is_rvalue_reference<T>::value, "Closure error");
+    std::remove_const_t<T> mutable _val;
 };
 
 template<typename T>
 struct closure_wrapper<T&> {
-    constexpr explicit closure_wrapper(T& r) noexcept : ref_(r) {}
-    constexpr T& get() const noexcept { return ref_; }
+    constexpr explicit closure_wrapper(T &r): _ref(r) {}
+    constexpr T& get() const{ return _ref; }
 private:
-    T& ref_;
+    T &_ref;
 };
 
-template<typename T>
-constexpr typename std::enable_if<
-    std::is_lvalue_reference<T>{}, closure_wrapper<T>>::type
-closure(std::remove_reference_t<T>& t) noexcept {
+template<typename T,
+    typename S = typename std::enable_if<
+        std::is_lvalue_reference<T>::value, closure_wrapper<T>>::type,
+    typename NonRefS = typename std::remove_reference_t<T>::type>
+constexpr S closure(NonRefS &t) {
     return closure_wrapper<T>(t);
 }
 
-template <typename T>
-constexpr typename std::enable_if<std::is_rvalue_reference<T&&>{},
-            closure_wrapper<std::remove_reference_t<T>>>::type
-    closure(std::remove_reference_t<T>&& t) noexcept(
-        std::is_nothrow_constructible<
-            closure_wrapper<std::remove_reference_t<T>>, T&&>{}) {
+template<typename T,
+    typename S = typename std::enable_if<std::is_rvalue_reference<T&&>::value,
+            closure_wrapper<std::remove_reference_t<T>>>::type>
+constexpr S closure(std::remove_reference_t<T>&& t) {
     return closure_wrapper<std::remove_reference_t<T>>(std::move(t));
 }
 
-template <typename T>
-constexpr typename std::enable_if<std::is_rvalue_reference<T&&>{},
-            closure_wrapper<std::remove_reference_t<T>>>::type
-    closure(std::remove_reference_t<T>& t) noexcept(
-        std::is_nothrow_constructible<
-            closure_wrapper<std::remove_reference_t<T>>, T&&>{}) {
+template<typename T,
+    typename S = typename std::enable_if<std::is_rvalue_reference<T&&>::value,
+            closure_wrapper<std::remove_reference_t<T>>>::type>
+constexpr S closure(std::remove_reference_t<T>& t) {
     return closure_wrapper<std::remove_reference_t<T>>(std::move(t));
 }
 
