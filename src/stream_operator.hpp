@@ -21,13 +21,14 @@ struct OperatorToVector: public StreamOperator {
 
 template<typename Transform>
 struct OperatorMap: public StreamOperator {
-    OperatorMap(Transform &&transform): _transform(transform) {}
+    OperatorMap(Transform &&transform)
+        : _transform(std::forward<Transform>(transform)) {}
     template<typename S>
     auto apply_to(S &&s) {
-        return s.map(_transform);
+        return s.map(std::forward<Transform>(_transform));
     }
 private:
-    Transform _transform;
+    Transform &&_transform;
 };
 
 template<typename ...Args>
@@ -35,38 +36,41 @@ struct OperatorReduce;
 
 template<typename Accumulator>
 struct OperatorReduce<Accumulator>: public StreamOperator {
-    OperatorReduce(Accumulator &&accum): _accum(accum) {}
+    OperatorReduce(Accumulator &&accum)
+        : _accum(std::forward<Accumulator>(accum)) {}
     template<typename S>
     auto apply_to(S &&s) {
-        return s.reduce(_accum);
+        return s.reduce(std::forward<Accumulator>(_accum));
     }
 private:
-    Accumulator _accum;
+    Accumulator &&_accum;
 };
 
 template<typename IdentityFn, typename Accumulator>
 struct OperatorReduce<IdentityFn, Accumulator>: public StreamOperator {
     OperatorReduce(IdentityFn &&identityFn, Accumulator &&accum)
-        : _identityFn(identityFn)
-        , _accum(accum) {}
+        : _identityFn(std::forward<IdentityFn>(identityFn))
+        , _accum(std::forward<Accumulator>(accum)) {}
     template<typename S>
     auto apply_to(S &&s) {
-        return s.reduce(_identityFn, _accum);
+        return s.reduce(std::forward<IdentityFn>(_identityFn),
+                std::forward<Accumulator>(_accum));
     }
 private:
-    IdentityFn _identityFn;
-    Accumulator _accum;
+    IdentityFn &&_identityFn;
+    Accumulator &&_accum;
 };
 
 template<typename Predicate>
 struct OperatorFilter: public StreamOperator {
-    OperatorFilter(Predicate &&predicate): _predicate(predicate) {}
+    OperatorFilter(Predicate &&predicate)
+        : _predicate(std::forward<Predicate>(predicate)) {}
     template<typename S>
     auto apply_to(S &&s) {
-        return s.filter(_predicate);
+        return s.filter(std::forward<Predicate>(_predicate));
     }
 private:
-    Predicate _predicate;
+    Predicate &&_predicate;
 };
 
 struct OperatorSkip: public StreamOperator {

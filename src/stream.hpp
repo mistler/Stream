@@ -233,7 +233,7 @@ public:
         typename S = typename std::enable_if<
             std::is_base_of<StreamOperator, Func>::value, Func>::type>
     decltype(auto) operator|(Func &&f) {
-        return f.template apply_to<Stream<T>>(std::move(*this));
+        return f.template apply_to(*this);
     }
 
     // For transforms that can be applied on T
