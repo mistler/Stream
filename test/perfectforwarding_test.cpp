@@ -45,7 +45,12 @@ TEST(PerfectForwarding, MakeStreamConstContainer) {
 }
 
 TEST(PerfectForwarding, MakeStreamRvalueContainer) {
-    auto &&cont = std::vector<Perfect> { Perfect() };
+    std::vector<Perfect> &&cont = std::vector<Perfect> { Perfect() };
     auto s = MakeStream(cont);
+    UNUSED(s);
+}
+
+TEST(PerfectForwarding, MakeStreamVariadicRvalue) {
+    auto s = MakeStream(Perfect());
     UNUSED(s);
 }

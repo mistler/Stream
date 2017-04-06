@@ -83,7 +83,9 @@ auto MakeStreamVariadic(S &&s) {
     return std::forward<S>(s);
 }
 
-template<typename S, typename Arg, typename ...Args>
+template<typename S, typename Arg, typename ...Args,
+    typename TypeCheck = typename std::enable_if<
+        std::is_same<typename S::value_type, Arg>::value, Arg>::type>
 static auto MakeStreamVariadic(S &&s, Arg &&arg, Args &&...args) {
     s.append(std::forward<Arg>(arg));
     return MakeStreamVariadic(std::forward<S>(s),
@@ -98,15 +100,18 @@ template<typename Arg, typename ...Args,
 auto MakeStream(Arg &&arg, Args &&...args) {
     LOG("MakeStream: variadic create");
     std::vector<Arg> *vec = new std::vector<Arg>;
-    vec->push_back(arg);
+    vec->push_back(std::forward<Arg>(arg));
     return MakeStreamVariadic(Stream<Arg>(vec), std::forward<Args>(args)...);
 }
 
+// Special case for variadic MakeStream without arguments
 Stream<DefaultStreamType> MakeStream();
 
 template<typename T>
 class Stream {
 public:
+    typedef typename std::remove_reference<T>::type value_type;
+
     Stream(std::vector<T> *v): values(v) {}
     ~Stream() { LOG("Stream: destructor"); }
 
@@ -170,8 +175,9 @@ public:
     template<typename IdentityFn, typename Accumulator, typename U =
         decltype(std::declval<IdentityFn>()(std::declval<T>()))>
     U reduce(IdentityFn &&identityFn, Accumulator &&accum) {
-        LOG("Stream: reduce with identity execution");
+        LOG("Stream: reduce with identity");
         execute();
+        LOG("Stream: reduce with identity execution");
         auto &v = *reinterpret_cast<std::vector<T>*>(values.get());
         auto begin = v.begin();
         if (begin == v.end()) throw std::runtime_error(
@@ -186,8 +192,9 @@ public:
     // Hope that we have copy constructor for type T
     template<typename Accumulator>
     T reduce(Accumulator &&accum) {
-        LOG("Stream: reduce execution");
+        LOG("Stream: reduce");
         execute();
+        LOG("Stream: reduce execution");
         auto &v = *reinterpret_cast<std::vector<T>*>(values.get());
         auto begin = v.begin();
         if (begin == v.end()) throw std::runtime_error(

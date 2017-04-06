@@ -38,7 +38,7 @@ TEST(MakeStream, FromContainerEmpty) {
 }
 
 TEST(MakeStream, FromContainerMove) {
-    auto &&vec = std::vector<int>{0, 1, 2, 3, 4};
+    std::vector<int> &&vec = std::vector<int>{0, 1, 2, 3, 4};
     auto sv = MakeStream(vec);
     UNUSED(sv);
 }
