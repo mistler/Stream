@@ -16,6 +16,7 @@
 #include "stream_operator.hpp"
 #include "logger.hpp"
 #include "type_helpers.hpp"
+#include "closure.hpp"
 
 namespace stream {
 
@@ -156,14 +157,15 @@ public:
         decltype(std::declval<Transform>()(std::declval<T>()))>
     Stream<U> map(Transform &&transform) {
         LOG("Stream: map");
-        auto deferred = [&] (void *current_stream) {
+        auto deferred = [transform = closure<Transform>(transform)] (
+                void *current_stream) {
             LOG("Stream: map execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             auto svp = new std::vector<U>;
             svp->reserve(vp->size());
             for (auto it = vp->begin(); it != vp->end(); ++it) {
-                svp->push_back(transform(*it));
+                svp->push_back(transform.get()(*it));
             }
             cs->values.reset(svp);
         };
@@ -209,14 +211,15 @@ public:
     template<typename Predicate>
     Stream<T> filter(Predicate &&predicate) {
         LOG("Stream: filter");
-        auto deferred = [&] (void *current_stream) {
+        auto deferred = [predicate = closure<Predicate>(predicate)] (
+                void *current_stream) {
             LOG("Stream: filter execution");
             Stream<T> *cs = reinterpret_cast<Stream<T>*>(current_stream);
             auto vp = reinterpret_cast<std::vector<T>*>(cs->values.get());
             auto svp = new std::vector<T>;
             for (auto it = vp->begin(); it != vp->end(); ++it) {
                 auto &v = *it;
-                if (predicate(v)) svp->push_back(v);
+                if (predicate.get()(v)) svp->push_back(v);
             }
             cs->values.reset(svp);
         };
@@ -266,11 +269,11 @@ public:
             auto svp = new std::vector<Stream<T>>;
             // TODO: we dont want to reserve a lot of memory
             // It works not ok in case of input stream size = 1 and N = 100000
-            svp->reserve(div_up(vp->size(), N));
+            // svp->reserve(div_up(vp->size(), N));
             for (auto it = vp->begin();;) {
                 auto ivp = new std::vector<T>;
                 ivp->insert(ivp->end(), it, it+N);
-                svp->push_back(std::move(Stream<T>(ivp)));
+                svp->push_back(Stream<T>(ivp));
                 it += N;
                 if (it >= vp->end()) break;
             }
@@ -283,7 +286,6 @@ public:
 
     // Hope that we have operator+= for type T
     // Hope that we have copy constructor for T
-    // TODO: figure out what to do with empty stream
     T sum() {
         LOG("Stream: sum");
         execute();
@@ -362,20 +364,6 @@ private:
     }
 
 private:
-    friend auto MakeStream<T>(std::initializer_list<T> init);
-
-    template<typename Iterator>
-    friend auto MakeStream(Iterator begin, Iterator end);
-
-    template<typename Container>
-    friend auto MakeStream(const Container &cont);
-
-    template<typename Container>
-    friend auto MakeStream(Container &&cont);
-
-    template<typename Generator>
-    friend auto MakeStream(Generator &&generator);
-
     template<typename U>
     friend class Stream;
 };

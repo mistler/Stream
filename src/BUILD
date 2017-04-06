@@ -10,6 +10,7 @@ cc_library (
             "logger.hpp",
             "stream_operator.hpp",
             "type_helpers.hpp",
+            "closure.hpp",
     ],
     srcs = ["stream_operator.cpp", "stream.cpp"],
     visibility = ["//test:__pkg__"],
