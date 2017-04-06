@@ -5,12 +5,12 @@
 
 using namespace stream;
 
-TEST(StreamTest, SimpleTest) {
+TEST(Stream, SimpleTest) {
     auto s = MakeStream({1, 2, 3, 4, 5});
     (s | map([](int x) { return x * x; }) | print_to(std::cout)) << std::endl;
 }
 
-TEST(StreamTest, ComplexTest) {
+TEST(Stream, ComplexTest) {
     float f = MakeStream(1, 2, 3)
         | map([](auto x) { return static_cast<float>(x * x); })
         | map([](auto x) { return std::vector<float>{x}; })

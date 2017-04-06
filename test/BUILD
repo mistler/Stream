@@ -19,7 +19,7 @@ cc_test(
             "reduce_test.cpp",
             "group_test.cpp",
             "pipe_test.cpp",
-            "simple_test.cpp",
+            "stream_test.cpp",
             "perfectforwarding_test.cpp",
     ],
     copts = GTEST_COPTS,
