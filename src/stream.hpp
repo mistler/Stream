@@ -180,7 +180,7 @@ public:
                 "Empty stream in reduce function with identity");
         U total = identityFn(*(begin++));
         for (auto it = begin; it != v.end(); ++it) {
-            total = accum(total, *it);
+            total = accum(total, std::forward<T>(*it));
         }
         return total;
     }
@@ -197,7 +197,7 @@ public:
                 "Empty stream in reduce function");
         T total = *(begin++);
         for (auto it = begin; it != v.end(); ++it) {
-            total = accum(total, *it);
+            total = accum(total, std::forward<T>(*it));
         }
         return total;
     }
@@ -213,7 +213,7 @@ public:
             auto svp = new std::vector<T>;
             for (auto it = vp->begin(); it != vp->end(); ++it) {
                 auto &v = *it;
-                if (predicate.get()(v)) svp->push_back(v);
+                if (predicate.get()(v)) svp->push_back(std::forward<T>(v));
             }
             cs->values.reset(svp);
         };
@@ -227,7 +227,7 @@ public:
         typename S = typename std::enable_if<
             std::is_base_of<StreamOperator, Func>::value, Func>::type>
     decltype(auto) operator|(Func &&f) {
-        return f.template apply_to(*this);
+        return f.template apply_to(std::forward<Stream<T>>(*this));
     }
 
     // For transforms that can be applied on T
@@ -290,7 +290,7 @@ public:
             throw std::runtime_error("Stream is empty in sum function");
         T total = *(begin++);
         for (auto it = begin; it != vp->end(); ++it) {
-            total += *it;
+            total += std::forward<T>(*it);
         }
         return total;
     }
@@ -302,21 +302,21 @@ public:
         auto vp = reinterpret_cast<std::vector<T>*>(values.get());
         auto it = vp->begin();
         if (it == vp->end()) return os;
-        os << *(it++);
+        os << std::forward<T>(*(it++));
         for (; it != vp->end(); ++it) {
             os << delimiter << *it;
         }
         return os;
     }
 
-    std::vector<T> to_vector() {
+    std::vector<T> &to_vector() {
         LOG("Stream: to_vector");
         execute();
         LOG("Stream: to_vector execution");
         return *reinterpret_cast<std::vector<T>*>(values.get());
     }
 
-    T nth(const size_t index) {
+    T &nth(const size_t index) {
         LOGV("Stream: nth", index);
         execute();
         LOGV("Stream: nth execution", index);

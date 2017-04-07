@@ -21,6 +21,7 @@ cc_test(
             "pipe_test.cpp",
             "stream_test.cpp",
             "perfectforwarding_test.cpp",
+            "uniqueptr_test.cpp",
     ],
     copts = GTEST_COPTS,
     deps = [

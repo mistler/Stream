@@ -14,7 +14,7 @@ struct StreamOperator {};
 
 struct OperatorToVector: public StreamOperator {
     template<typename S>
-    auto apply_to(S &&s) {
+    auto &apply_to(S &&s) {
         return s.to_vector();
     }
 };
@@ -116,7 +116,7 @@ private:
 struct OperatorNth: public StreamOperator {
     OperatorNth(const size_t index): _index(index) {}
     template<typename S>
-    auto apply_to(S &&s) {
+    auto &apply_to(S &&s) {
         return s.nth(_index);
     }
 private:
