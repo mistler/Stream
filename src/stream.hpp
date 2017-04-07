@@ -73,7 +73,7 @@ template<typename Generator,
     typename T = decltype(std::declval<Generator>()())>
 auto MakeStream(Generator &&generator) {
     LOG("MakeStream: Generator &&genereator");
-    std::vector<T> *vec = new std::vector<T>{ generator() };
+    std::vector<T> *vec = new std::vector<T>{ std::move(generator()) };
     return Stream<T>(vec);
 }
 
@@ -87,8 +87,9 @@ auto MakeStreamVariadic(S &&s) {
 template<typename S, typename Arg, typename ...Args,
     typename TypeCheck = typename std::enable_if<
         std::is_same<typename S::value_type, Arg>::value, Arg>::type>
-static auto MakeStreamVariadic(S &&s, Arg &&arg, Args &&...args) {
-    s.append(std::forward<Arg>(arg));
+auto MakeStreamVariadic(S &&s, Arg &&arg, Args &&...args) {
+    auto vp = reinterpret_cast<std::vector<Arg>*>(s.getVector());
+    vp->push_back(std::forward<Arg>(arg));
     return MakeStreamVariadic(std::forward<S>(s),
                 std::forward<Args>(args)...);
 }
@@ -101,8 +102,8 @@ template<typename Arg, typename ...Args,
 auto MakeStream(Arg &&arg, Args &&...args) {
     LOG("MakeStream: variadic create");
     std::vector<Arg> *vec = new std::vector<Arg>;
-    vec->push_back(std::forward<Arg>(arg));
-    return MakeStreamVariadic(Stream<Arg>(vec), std::forward<Args>(args)...);
+    return MakeStreamVariadic<Stream<Arg>, Args...>(std::move(Stream<Arg>(vec)),
+            std::forward<Arg>(arg), std::forward<Args>(args)...);
 }
 
 // Special case for variadic MakeStream without arguments
@@ -118,10 +119,7 @@ public:
 
     Stream(const Stream<T> &s) {
         LOG("Stream: copy constructor");
-        auto svp = new std::vector<T>;
-        auto vp = reinterpret_cast<std::vector<T>*>(s.values.get());
-        svp->insert(svp->end(), vp->begin(), vp->end());
-        values.reset(svp);
+        values = s.values;
         functions = s.functions;
     }
 
@@ -133,10 +131,7 @@ public:
 
     Stream<T> &operator=(const Stream<T> &s) {
         LOG("Stream: assignment");
-        auto svp = new std::vector<T>;
-        auto vp = reinterpret_cast<std::vector<T>*>(s.values.get());
-        svp->insert(svp->end(), vp->begin(), vp->end());
-        values.reset(svp);
+        values = s.values;
         functions = s.functions;
         return *this;
     }
@@ -148,9 +143,8 @@ public:
         return *this;
     }
 
-    void append(T &&t) {
-        auto vp = reinterpret_cast<std::vector<T>*>(values.get());
-        vp->push_back(std::forward<T>(t));
+    void *getVector() {
+        return values.get();
     }
 
     template<typename Transform, typename U =
@@ -165,7 +159,7 @@ public:
             auto svp = new std::vector<U>;
             svp->reserve(vp->size());
             for (auto it = vp->begin(); it != vp->end(); ++it) {
-                svp->push_back(transform.get()(*it));
+                svp->push_back(transform.get()(std::forward<T>(*it)));
             }
             cs->values.reset(svp);
         };

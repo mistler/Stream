@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <vector>
+#include <memory>
 
 using namespace stream;
 
@@ -53,4 +54,10 @@ TEST(PerfectForwarding, MakeStreamRvalueContainer) {
 TEST(PerfectForwarding, MakeStreamVariadicRvalue) {
     auto s = MakeStream(Perfect());
     UNUSED(s);
+}
+
+TEST(PerfectForwarding, Example) {
+    auto s = MakeStream(Perfect(), Perfect(), Perfect(), Perfect());
+    std::cout << ( s| map([](auto &&x) { return std::move(x); })
+            | map([](auto x) { return x; }) | to_vector()).size() << std::endl;
 }
